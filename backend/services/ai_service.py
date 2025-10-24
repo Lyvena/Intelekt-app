@@ -98,7 +98,7 @@ class AIService:
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "grok-beta",
+                    "model": "grok-3",
                     "messages": grok_messages,
                     "max_tokens": max_tokens,
                     "temperature": 0.7

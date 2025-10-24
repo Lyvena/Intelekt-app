@@ -1,0 +1,23 @@
+{
+  "name": "intelekt",
+  "description": "AI-powered web application builder using Claude and Grok",
+  "version": "1.0.0",
+  "python": "3.10",
+  "services": {
+    "web": {
+      "build_command": "pip install -r backend/requirements.txt && pip install 'numpy<2.0'",
+      "command": "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT",
+      "port": 8000
+    }
+  },
+  "addons": {
+    "postgres": {
+      "version": "14",
+      "plan": "standard"
+    }
+  },
+  "environment": {
+    "PYTHONUNBUFFERED": "1",
+    "PORT": "80"
+  }
+}
