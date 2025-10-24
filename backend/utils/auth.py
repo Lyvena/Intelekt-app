@@ -6,11 +6,12 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from models.database import get_db, User
+from config import settings
 
-# Security configuration
-SECRET_KEY = "your-secret-key-change-this-in-production"  # TODO: Move to environment variable
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days
+# Security configuration from settings
+SECRET_KEY = settings.secret_key
+ALGORITHM = settings.algorithm
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")

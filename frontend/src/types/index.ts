@@ -47,3 +47,42 @@ export interface ProjectFile {
   path: string;
   content: string;
 }
+
+// Authentication types
+export interface User {
+  id: string;
+  email: string;
+  username: string;
+  full_name?: string;
+  is_active: boolean;
+  is_superuser: boolean;
+  created_at: string;
+}
+
+export interface LoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface RegisterRequest {
+  email: string;
+  username: string;
+  password: string;
+  full_name?: string;
+}
+
+export interface AuthResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+}
+
+export interface AuthContextType {
+  user: User | null;
+  token: string | null;
+  login: (username: string, password: string) => Promise<void>;
+  register: (data: RegisterRequest) => Promise<void>;
+  logout: () => void;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}

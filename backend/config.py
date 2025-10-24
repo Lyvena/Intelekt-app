@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     anthropic_api_key: Optional[str] = None
     xai_api_key: Optional[str] = None
     
+    # Security
+    secret_key: str = os.getenv("SECRET_KEY", "your-secret-key-change-in-production-please-use-a-long-random-string")
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30 * 24 * 60  # 30 days
+    
     # Database - Use Divio's volume paths if available
     chromadb_path: str = os.getenv("CHROMADB_PATH", "/data/chromadb" if os.path.exists("/data") else "./data/chromadb")
     

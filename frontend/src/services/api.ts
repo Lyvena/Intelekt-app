@@ -5,6 +5,9 @@ import type {
   Project,
   ProjectCreate,
   ProjectFile,
+  LoginRequest,
+  RegisterRequest,
+  AuthResponse,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
@@ -15,6 +18,29 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+// Add auth token to requests
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Handle 401 responses
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Clear token and redirect to login
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/';
+    }
+    return Promise.reject(error);
+  }
+);
 
 export const chatAPI = {
   sendMessage: async (request: ChatRequest): Promise<ChatResponse> => {
@@ -71,6 +97,18 @@ export const projectsAPI = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/api/projects/${id}`);
+  },
+};
+
+export const authAPI = {
+  login: async (data: LoginRequest): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/api/auth/login', data);
+    return response.data;
+  },
+
+  register: async (data: RegisterRequest): Promise<AuthResponse> => {
+    const response = await api.post<AuthResponse>('/api/auth/register', data);
+    return response.data;
   },
 };
 
