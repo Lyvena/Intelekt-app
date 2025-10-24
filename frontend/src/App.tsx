@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Brain, Plus, MessageSquare, Folder, Download, Trash2 } from 'lucide-react';
+import { Brain, Plus, Folder, Download, Trash2 } from 'lucide-react';
 import { chatAPI, projectsAPI } from './services/api';
 import type { Project, ChatMessage, AIProvider, TechStack } from './types';
 import { cn, formatDate, downloadBlob } from './lib/utils';
