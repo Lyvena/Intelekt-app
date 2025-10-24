@@ -19,7 +19,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     );
   }
 
-  if (\!isAuthenticated) {
+  if (!isAuthenticated) {
     return null; // Auth forms will be shown by App.tsx
   }
 

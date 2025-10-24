@@ -4,7 +4,7 @@ import { LogOut, User } from 'lucide-react';
 export function UserHeader() {
   const { user, logout } = useAuth();
 
-  if (\!user) return null;
+  if (!user) return null;
 
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-3">
