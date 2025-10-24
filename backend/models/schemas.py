@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, List, Literal
 from datetime import datetime
 from enum import Enum
@@ -77,3 +77,45 @@ class CodeGenerationResponse(BaseModel):
     explanation: str
     file_name: str
     dependencies: List[str] = Field(default_factory=list)
+
+
+# Authentication Schemas
+class UserBase(BaseModel):
+    """Base user schema."""
+    email: EmailStr
+    username: str
+    full_name: Optional[str] = None
+
+
+class UserCreate(UserBase):
+    """Schema for creating a user."""
+    password: str
+
+
+class UserLogin(BaseModel):
+    """Schema for user login."""
+    username: str
+    password: str
+
+
+class User(UserBase):
+    """User response schema."""
+    id: str
+    is_active: bool
+    is_superuser: bool
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class Token(BaseModel):
+    """Token response schema."""
+    access_token: str
+    token_type: str = "bearer"
+    user: User
+
+
+class TokenData(BaseModel):
+    """Token data schema."""
+    user_id: Optional[str] = None
