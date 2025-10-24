@@ -31,6 +31,8 @@ class Settings(BaseSettings):
         "https://*.railway.app",
         "https://*.vercel.app",
         "https://*.netlify.app",
+        "https://app.theintelekt.xyz",
+        "https://theintelekt.xyz",
     ]
     
     # Database URL (for future PostgreSQL integration)
