@@ -31,7 +31,9 @@ class Settings(BaseSettings):
         "https://*.railway.app",
         "https://*.vercel.app",
         "https://*.netlify.app",
+        "https://*.pages.dev",
         "https://app.theintelekt.xyz",
+        "https://app1.theintelekt.xyz",
         "https://theintelekt.xyz",
     ]
     
