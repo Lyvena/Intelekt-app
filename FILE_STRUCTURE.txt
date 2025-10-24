@@ -1,0 +1,98 @@
+Intelekt app/
+│
+├── 📄 README.md                    # Main project documentation
+├── 📄 QUICKSTART.md               # Quick start guide
+├── 📄 ARCHITECTURE.md             # Technical architecture details
+├── 📄 PROJECT_SUMMARY.md          # Project overview and summary
+├── 📄 STATUS.md                   # Current project status
+├── 📄 FILE_STRUCTURE.txt          # This file - visual structure
+├── 📄 .gitignore                  # Git ignore rules
+├── 🔧 setup.sh                    # Automated setup script (executable)
+│
+├── 📁 backend/                    # Python FastAPI Backend
+│   ├── 📄 main.py                # FastAPI application entry point
+│   ├── 📄 config.py              # Configuration and settings
+│   ├── 📄 requirements.txt       # Python dependencies
+│   ├── 📄 .env.example          # Environment variables template
+│   │
+│   ├── 📁 models/               # Data models and schemas
+│   │   ├── 📄 __init__.py      # Package initialization
+│   │   └── 📄 schemas.py       # Pydantic models and enums
+│   │
+│   ├── 📁 services/             # Business logic layer
+│   │   ├── 📄 __init__.py      # Package initialization
+│   │   ├── 📄 ai_service.py    # Claude & Grok AI integration
+│   │   ├── 📄 chroma_service.py # ChromaDB vector operations
+│   │   └── 📄 code_generator.py # Code generation logic
+│   │
+│   └── 📁 routes/               # API endpoints
+│       ├── 📄 __init__.py      # Package initialization
+│       ├── 📄 chat.py          # Chat API endpoints
+│       └── 📄 projects.py      # Project management endpoints
+│
+└── 📁 frontend/                  # React TypeScript Frontend
+    ├── 📄 package.json          # Node.js dependencies
+    ├── 📄 tsconfig.json         # TypeScript configuration
+    ├── 📄 tsconfig.node.json    # TypeScript Node configuration
+    ├── 📄 vite.config.ts        # Vite build tool configuration
+    ├── 📄 tailwind.config.js    # TailwindCSS configuration
+    ├── 📄 postcss.config.js     # PostCSS configuration
+    ├── 📄 .eslintrc.cjs         # ESLint configuration
+    ├── 📄 index.html            # HTML entry point
+    │
+    └── 📁 src/                  # Source code
+        ├── 📄 main.tsx          # React application entry point
+        ├── 📄 App.tsx           # Main application component
+        ├── 📄 index.css         # Global styles and TailwindCSS
+        │
+        ├── 📁 types/            # TypeScript type definitions
+        │   └── 📄 index.ts     # All type definitions
+        │
+        ├── 📁 services/         # API and external services
+        │   └── 📄 api.ts       # Backend API client
+        │
+        └── 📁 lib/              # Utility functions
+            └── 📄 utils.ts     # Helper functions
+
+
+GENERATED AT RUNTIME (not in repository):
+├── 📁 backend/data/             # Created by application
+│   └── 📁 chromadb/            # ChromaDB vector storage
+│
+├── 📁 backend/generated_projects/ # Created by application
+│   └── 📁 {project-id}/        # Individual project directories
+│       ├── 📄 project.json     # Project metadata
+│       └── ...                 # Generated files
+│
+├── 📁 backend/venv/             # Python virtual environment
+│
+└── 📁 frontend/node_modules/    # Node.js dependencies
+
+
+FILE COUNT SUMMARY:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Documentation Files:     6 files
+Backend Files:          13 files (Python)
+Frontend Files:         14 files (TypeScript/React)
+Configuration Files:     7 files
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+TOTAL:                  40 files
+
+
+KEY FILES TO UNDERSTAND:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+1. backend/main.py              - FastAPI application setup
+2. backend/services/ai_service.py - AI provider integration
+3. backend/routes/chat.py       - Chat API logic
+4. frontend/src/App.tsx         - Main React component
+5. frontend/src/services/api.ts - API client
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+IMPORTANT PATHS:
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Backend API:     http://localhost:8000
+API Docs:        http://localhost:8000/docs
+Frontend:        http://localhost:5173
+Health Check:    http://localhost:8000/health
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
