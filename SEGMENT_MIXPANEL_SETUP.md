@@ -61,34 +61,29 @@ Before you begin, you'll need:
 
 ---
 
-## 🔧 Step 3: Update Your App Configuration
+## 🔧 Step 3: Segment Configuration
 
-### 3.1 Add Your Segment Write Key
+### 3.1 Segment Write Key Already Configured! ✅
 
-Replace `YOUR_SEGMENT_WRITE_KEY` in `frontend/index.html`:
-
-```html
-<!-- Find this line (appears twice): -->
-analytics.load("YOUR_SEGMENT_WRITE_KEY");
-
-<!-- Replace with your actual key: -->
-analytics.load("abc123xyz456...");
+Your Segment CDP is already set up with Write Key:
+```
+0WTAZaRXGEzVm9holWqVUoVcsPrhoX6R
 ```
 
-**Or use environment variable (recommended):**
+The Segment snippet in `frontend/index.html` is ready to use. No additional configuration needed!
 
-1. Create `frontend/.env`:
-```env
-VITE_SEGMENT_WRITE_KEY=your_actual_write_key_here
+### 3.2 Verify Installation
+
+Once deployed, you can verify Segment is working:
+
+1. Open your app in a browser
+2. Open DevTools (F12) → Console
+3. Type: `analytics`
+4. You should see the Segment analytics object
+
+Or check Network tab for requests to:
 ```
-
-2. Update `index.html` to use it:
-```html
-<script>
-  // ... segment code ...
-  analytics.load(import.meta.env.VITE_SEGMENT_WRITE_KEY);
-  // ... rest of code ...
-</script>
+https://cdn.segment.com/analytics.js/v1/0WTAZaRXGEzVm9holWqVUoVcsPrhoX6R/analytics.min.js
 ```
 
 ---
