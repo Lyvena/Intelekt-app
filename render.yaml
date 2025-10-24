@@ -1,0 +1,47 @@
+# Render Blueprint for Intelekt
+# This file enables one-click deployment to Render
+
+services:
+  # Backend API Service
+  - type: web
+    name: intelekt-backend
+    runtime: python
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt && pip install 'numpy<2.0'
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10
+      - key: CHROMADB_PATH
+        value: /data/chromadb
+      - key: PROJECTS_PATH
+        value: /data/generated_projects
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
+    disk:
+      name: intelekt-data
+      mountPath: /data
+      sizeGB: 1
+
+  # Frontend Static Site (Optional)
+  - type: web
+    name: intelekt-frontend
+    runtime: static
+    region: oregon
+    plan: free
+    branch: main
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        fromService:
+          type: web
+          name: intelekt-backend
+          property: url

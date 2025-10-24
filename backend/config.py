@@ -20,13 +20,17 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = int(os.getenv("PORT", 8000))
     
-    # CORS - Allow Divio domains
+    # CORS - Allow multiple hosting platforms
     cors_origins: list = [
         "http://localhost:5173",
         "http://localhost:3000",
+        "https://*.onrender.com",
         "https://*.divio-media.net",
         "https://*.divio-media.com",
         "https://*.divio.app",
+        "https://*.railway.app",
+        "https://*.vercel.app",
+        "https://*.netlify.app",
     ]
     
     # Database URL (for future PostgreSQL integration)
