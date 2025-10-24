@@ -60,7 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     login,
     register,
     logout,
-    isAuthenticated: \!\!token && \!\!user,
+    isAuthenticated: !!token && !!user,
     isLoading,
   };
 

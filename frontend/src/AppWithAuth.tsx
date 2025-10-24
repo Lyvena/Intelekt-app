@@ -10,7 +10,7 @@ function AuthenticatedApp() {
   const { isAuthenticated } = useAuth();
   const [showRegister, setShowRegister] = useState(false);
 
-  if (\!isAuthenticated) {
+  if (!isAuthenticated) {
     return showRegister ? (
       <RegisterForm onSwitchToLogin={() => setShowRegister(false)} />
     ) : (
