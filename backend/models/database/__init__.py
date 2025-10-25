@@ -1,5 +1,5 @@
-from .base import Base, get_db, engine
+from .base import Base, get_db, engine, SessionLocal
 from .user import User
 from .project import Project as DBProject
 
-__all__ = ["Base", "get_db", "engine", "User", "DBProject"]
+__all__ = ["Base", "get_db", "engine", "SessionLocal", "User", "DBProject"]
