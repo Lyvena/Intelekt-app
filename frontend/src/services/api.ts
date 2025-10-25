@@ -110,6 +110,18 @@ export const authAPI = {
     const response = await api.post<AuthResponse>('/api/auth/register', data);
     return response.data;
   },
+
+  post: async (url: string, data?: any) => {
+    return api.post(url, data);
+  },
+
+  get: async (url: string) => {
+    return api.get(url);
+  },
+
+  delete: async (url: string) => {
+    return api.delete(url);
+  },
 };
 
 export default api;

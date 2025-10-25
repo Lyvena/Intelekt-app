@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from routes import chat_router, projects_router
 from routes.auth import router as auth_router
+from routes.preview import router as preview_router
 from config import settings
 from models.database import Base, engine
 import os
@@ -27,6 +28,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(projects_router)
+app.include_router(preview_router)
 
 
 @app.get("/")
