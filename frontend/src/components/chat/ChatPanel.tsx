@@ -17,6 +17,9 @@ export const ChatPanel: React.FC = () => {
     clearStreamingMessage,
     addMessage,
     aiProvider,
+    projectFiles,
+    setProjectFiles,
+    setShowPreview,
   } = useStore();
 
   const messages = useCurrentProjectMessages();
@@ -77,10 +80,14 @@ export const ChatPanel: React.FC = () => {
       }
 
       let fullResponse = '';
+      let streamComplete = false;
 
-      while (true) {
+      while (!streamComplete) {
         const { done, value } = await reader.read();
-        if (done) break;
+        if (done) {
+          streamComplete = true;
+          continue;
+        }
 
         const chunk = decoder.decode(value);
         const lines = chunk.split('\n');
@@ -94,7 +101,29 @@ export const ChatPanel: React.FC = () => {
                 fullResponse += data.content;
                 appendStreamingMessage(data.content);
               } else if (data.type === 'code') {
-                // Handle generated code
+                // Handle generated code - add to project files
+                const existingFiles = projectFiles[currentProject.id] || [];
+                const fileExists = existingFiles.some(f => f.path === data.file_path);
+                
+                const newFile = {
+                  path: data.file_path,
+                  content: data.code,
+                };
+                
+                if (fileExists) {
+                  setProjectFiles(
+                    currentProject.id,
+                    existingFiles.map(f => f.path === data.file_path ? newFile : f)
+                  );
+                } else {
+                  setProjectFiles(currentProject.id, [...existingFiles, newFile]);
+                }
+                
+                // Show preview automatically for HTML/JS files
+                if (data.file_path.endsWith('.html') || data.file_path.endsWith('.js') || data.file_path.endsWith('.css')) {
+                  setShowPreview(true);
+                }
+                
                 const codeMessage: ChatMessage = {
                   role: 'assistant',
                   content: `Generated file: \`${data.file_path}\`\n\n\`\`\`\n${data.code}\n\`\`\``,

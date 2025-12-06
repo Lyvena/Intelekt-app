@@ -1,13 +1,13 @@
 import { useEffect } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { useStore } from './store/useStore';
+import { useStore, usePreviewFiles } from './store/useStore';
 import { projectsAPI } from './services/api';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { FileExplorer } from './components/editor/FileExplorer';
 import { CodeEditor } from './components/editor/CodeEditor';
 import { NewProjectModal } from './components/modals/NewProjectModal';
-import { PreviewPanel } from './components/preview/PreviewPanel';
+import { LivePreview } from './components/preview/LivePreview';
 
 function App() {
   const { 
@@ -16,6 +16,8 @@ function App() {
     showPreview, 
     setShowPreview,
   } = useStore();
+  
+  const previewFiles = usePreviewFiles();
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -29,24 +31,6 @@ function App() {
     loadProjects();
   }, [setProjects]);
 
-  // Prepare files for preview
-  const getPreviewFiles = (): Record<string, string> => {
-    const files: Record<string, string> = {};
-    // This would need to pull from projectFiles in the store
-    return files;
-  };
-
-  const getProjectType = (): 'python' | 'javascript' | 'html' => {
-    if (!currentProject) return 'python';
-    switch (currentProject.tech_stack) {
-      case 'javascript':
-        return 'javascript';
-      case 'python':
-      case 'mojo':
-      default:
-        return 'python';
-    }
-  };
 
   return (
     <div className="flex h-screen bg-background">
@@ -91,12 +75,10 @@ function App() {
       {/* Modals */}
       <NewProjectModal />
 
-      {/* Preview Panel */}
-      {showPreview && currentProject && (
-        <PreviewPanel
-          projectId={currentProject.id}
-          files={getPreviewFiles()}
-          projectType={getProjectType()}
+      {/* Live Preview */}
+      {showPreview && (
+        <LivePreview
+          files={previewFiles}
           onClose={() => setShowPreview(false)}
         />
       )}

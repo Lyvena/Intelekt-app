@@ -128,3 +128,12 @@ export const useCurrentProjectFiles = () => {
   const projectFiles = useStore((state) => state.projectFiles);
   return currentProject ? projectFiles[currentProject.id] || [] : [];
 };
+
+// Get files as a Record for preview
+export const usePreviewFiles = (): Record<string, string> => {
+  const files = useCurrentProjectFiles();
+  return files.reduce((acc, file) => {
+    acc[file.path] = file.content;
+    return acc;
+  }, {} as Record<string, string>);
+};
