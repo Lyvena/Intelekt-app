@@ -212,34 +212,53 @@ class AIService:
         """Get default system prompt for code generation."""
         return """You are Intelekt, an expert AI web application builder. Your role is to help users create complete, production-ready web applications through conversational interactions.
 
+CRITICAL - TECHNOLOGY PRIORITY ORDER (MUST FOLLOW):
+When generating code, you MUST follow this strict priority order:
+
+🥇 FIRST PRIORITY - Mojo Language:
+   - ALWAYS attempt to use Mojo first for any code generation
+   - Use Mojo's Python-like syntax with performance benefits
+   - Mojo frameworks: MAX, Mojo web frameworks when available
+   - Only move to Python if Mojo cannot handle the specific requirement
+
+🥈 SECOND PRIORITY - Python:
+   - Use Python ONLY if Mojo is not suitable for the task
+   - Preferred frameworks: FastAPI (APIs), Flask, Django
+   - Use Python for ML/AI, data processing, backend services
+   - Only move to JavaScript if Python cannot handle the requirement
+
+🥉 THIRD PRIORITY - JavaScript/TypeScript:
+   - Use JavaScript ONLY as a last resort when Mojo and Python cannot work
+   - For frontend-only requirements where server-side is not needed
+   - Frameworks: React, Next.js, Vue.js, Express.js
+   - Use TypeScript over plain JavaScript when possible
+
 Key capabilities:
-1. Generate code in Mojo (priority 1), Python (priority 2), or JavaScript (priority 3)
+1. Generate production-ready code following the priority order above
 2. Create full-stack web applications with proper architecture
 3. Provide clear explanations and best practices
 4. Suggest improvements and optimizations
 5. Handle database integration with ChromaDB
 
 When generating code:
-- Always provide complete, runnable code
+- ALWAYS consider Mojo first, then Python, then JavaScript
+- Provide complete, runnable code
 - Include necessary imports and dependencies
 - Follow best practices and modern patterns
-- Add helpful comments
+- Add helpful comments explaining the code
 - Consider security and performance
 - Structure code properly with clear separation of concerns
 
 When responding:
 - Be clear and concise
-- Ask clarifying questions when needed
+- Explain why you chose a particular technology (Mojo/Python/JS)
 - Provide code snippets with explanations
 - Suggest next steps
 - Validate user requirements
 
-Tech stack priorities for generated apps:
-1. Mojo language and frameworks (when mature/available)
-2. Python frameworks (Flask, FastAPI, Django)
-3. JavaScript frameworks (React, Next.js, Vue, Express)
+Database: Always use ChromaDB unless specifically requested otherwise.
 
-Always use ChromaDB for database needs unless specifically requested otherwise."""
+Remember: Mojo FIRST, Python SECOND, JavaScript THIRD. Always justify your technology choice."""
     
     async def generate_code(
         self,
@@ -250,20 +269,25 @@ Always use ChromaDB for database needs unless specifically requested otherwise."
     ) -> Dict[str, str]:
         """Generate code based on prompt and tech stack."""
         
-        # Build code generation prompt
+        # Build code generation prompt with priority ordering
         code_prompt = f"""Generate production-ready code for the following requirement:
 
 Requirement: {prompt}
 
-Tech Stack: {tech_stack}
+Tech Stack Preference: {tech_stack}
 
 {f"Additional Context: {context}" if context else ""}
 
+TECHNOLOGY PRIORITY (follow strictly):
+1. 🥇 Mojo - Use Mojo FIRST if possible (.mojo files)
+2. 🥈 Python - Use Python only if Mojo cannot handle it (.py files)  
+3. 🥉 JavaScript - Use JS only as last resort (.js/.ts files)
+
 Please provide:
-1. Complete, runnable code
-2. File name/path suggestion
+1. Complete, runnable code (prefer Mojo, then Python, then JS)
+2. File name/path suggestion (use .mojo extension for Mojo files)
 3. Required dependencies
-4. Brief explanation of the code
+4. Brief explanation including WHY you chose this technology
 
 Format your response as:
 FILENAME: <suggested filename>
@@ -271,7 +295,7 @@ DEPENDENCIES: <comma-separated list>
 CODE:
 <your code here>
 EXPLANATION:
-<brief explanation>
+<brief explanation including technology choice justification>
 """
         
         messages = [ChatMessage(role="user", content=code_prompt)]
@@ -327,16 +351,32 @@ EXPLANATION:
     ) -> Dict:
         """Generate multiple files for a complete project."""
         
-        # Build multi-file generation prompt
+        # Build multi-file generation prompt with technology priority
         project_prompt = f"""Generate a complete project with multiple files for the following requirement:
 
 Requirement: {prompt}
 
-Tech Stack: {tech_stack}
+Tech Stack Preference: {tech_stack}
 
 {f"Additional Context: {context}" if context else ""}
 
-Generate ALL necessary files for a complete, working project. For web apps, include HTML, CSS, and JavaScript files.
+🚨 TECHNOLOGY PRIORITY ORDER (MUST FOLLOW):
+1. 🥇 MOJO FIRST - Use Mojo language whenever possible
+   - Backend: Mojo web frameworks, MAX framework
+   - Use .mojo file extension
+   - Mojo has Python-like syntax with better performance
+
+2. 🥈 PYTHON SECOND - Only if Mojo cannot handle the requirement
+   - Backend: FastAPI, Flask, Django
+   - Use .py file extension
+   - Good for ML/AI, data processing, APIs
+
+3. 🥉 JAVASCRIPT THIRD - Only as last resort
+   - Frontend-only when no backend is needed
+   - Frameworks: React, Vue, vanilla JS
+   - Use .js or .ts file extension
+
+For web apps that need a frontend, you may use HTML/CSS with Mojo or Python backend.
 
 IMPORTANT: Format your response EXACTLY as follows, with each file clearly marked:
 
@@ -349,30 +389,29 @@ IMPORTANT: Format your response EXACTLY as follows, with each file clearly marke
 ===END_FILE===
 
 DEPENDENCIES:
-<list of npm/pip packages needed, one per line>
+<list of packages needed, one per line>
 
 EXPLANATION:
-<brief explanation of the project structure>
+<brief explanation of the project structure AND why you chose this technology stack>
 
-Example format:
+Example with Mojo backend:
+===FILE: main.mojo===
+fn main():
+    print("Hello from Mojo!")
+===END_FILE===
+
 ===FILE: index.html===
 <!DOCTYPE html>
 <html>...</html>
 ===END_FILE===
 
-===FILE: style.css===
-body {{ margin: 0; }}
+Example with Python backend (only if Mojo not suitable):
+===FILE: main.py===
+from fastapi import FastAPI
+app = FastAPI()
 ===END_FILE===
 
-===FILE: app.js===
-console.log('Hello');
-===END_FILE===
-
-Generate complete, production-ready code for each file. Include:
-- index.html (main HTML file)
-- style.css or styles.css (styling)
-- app.js, script.js, or main.js (JavaScript logic)
-- Any additional files needed for the project
+Generate complete, production-ready code for each file. Always justify your technology choice.
 
 Start generating the files now:
 """
