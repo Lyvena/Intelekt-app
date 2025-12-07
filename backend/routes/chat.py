@@ -139,21 +139,38 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                 )
             
             # Check for code generation
-            code_generated = None
-            file_path = None
-            
             code_keywords = ["create", "generate", "build", "make", "write", "add", "implement"]
-            if chat_request.project_id and any(keyword in chat_request.message.lower() for keyword in code_keywords):
+            project_keywords = ["app", "application", "website", "project", "page", "todo", "dashboard", "landing", "portfolio", "game", "calculator", "form"]
+            
+            message_lower = chat_request.message.lower()
+            should_generate = chat_request.project_id and any(keyword in message_lower for keyword in code_keywords)
+            is_project_request = any(keyword in message_lower for keyword in project_keywords)
+            
+            if should_generate:
                 try:
-                    result = await code_generator.generate_file(
-                        project_id=chat_request.project_id,
-                        prompt=chat_request.message,
-                        context="\n".join([m.content for m in messages[-5:]])
-                    )
-                    code_generated = result["code"]
-                    file_path = result["file_path"]
-                    
-                    yield f"data: {json.dumps({'type': 'code', 'code': code_generated, 'file_path': file_path})}\n\n"
+                    if is_project_request:
+                        # Multi-file project generation
+                        result = await code_generator.generate_project(
+                            project_id=chat_request.project_id,
+                            prompt=chat_request.message,
+                            context="\n".join([m.content for m in messages[-5:]])
+                        )
+                        
+                        # Send each file separately
+                        for file_info in result.get("files", []):
+                            yield f"data: {json.dumps({'type': 'code', 'code': file_info['content'], 'file_path': file_info['path']})}\n\n"
+                        
+                        # Send project summary
+                        if result.get("explanation"):
+                            yield f"data: {json.dumps({'type': 'project_info', 'file_count': result['file_count'], 'dependencies': result['dependencies'], 'explanation': result['explanation']})}\n\n"
+                    else:
+                        # Single file generation
+                        result = await code_generator.generate_file(
+                            project_id=chat_request.project_id,
+                            prompt=chat_request.message,
+                            context="\n".join([m.content for m in messages[-5:]])
+                        )
+                        yield f"data: {json.dumps({'type': 'code', 'code': result['code'], 'file_path': result['file_path']})}\n\n"
                 except Exception as e:
                     print(f"Code generation failed: {e}")
             

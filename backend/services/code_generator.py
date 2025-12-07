@@ -203,6 +203,86 @@ class CodeGeneratorService:
         
         return None
     
+    async def generate_project(
+        self,
+        project_id: str,
+        prompt: str,
+        context: Optional[str] = None
+    ) -> Dict:
+        """Generate multiple files for a project at once."""
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+        
+        # Search for relevant code snippets
+        snippets = chroma_service.search_code_snippets(
+            prompt,
+            tech_stack=project.tech_stack.value,
+            n_results=3
+        )
+        
+        # Build context from snippets
+        snippet_context = ""
+        if snippets:
+            snippet_context = "\n\nRelevant code examples:\n"
+            for snippet in snippets:
+                snippet_context += f"\n{snippet['code']}\n"
+        
+        full_context = f"{context or ''}{snippet_context}"
+        
+        # Generate multiple files using AI
+        result = await ai_service.generate_project_files(
+            prompt=prompt,
+            tech_stack=project.tech_stack.value,
+            provider=project.ai_provider,
+            context=full_context
+        )
+        
+        project_path = self.projects_path / project_id
+        saved_files = []
+        
+        # Save each generated file
+        for file_info in result.get("files", []):
+            file_path = file_info["path"]
+            content = file_info["content"]
+            
+            full_file_path = project_path / file_path
+            full_file_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(full_file_path, "w") as f:
+                f.write(content)
+            
+            # Update project files list
+            if file_path not in project.files:
+                project.files.append(file_path)
+            
+            # Add code to ChromaDB
+            chroma_service.add_code_snippet(
+                code=content,
+                tech_stack=project.tech_stack.value,
+                description=f"{prompt} - {file_path}",
+                metadata={
+                    "project_id": project_id,
+                    "file_path": file_path
+                }
+            )
+            
+            saved_files.append({
+                "path": file_path,
+                "content": content
+            })
+        
+        # Update project metadata
+        project.updated_at = datetime.now()
+        self._save_project_metadata(project)
+        
+        return {
+            "files": saved_files,
+            "dependencies": result.get("dependencies", []),
+            "explanation": result.get("explanation", ""),
+            "file_count": len(saved_files)
+        }
+
     def get_project_structure(self, project_id: str) -> Dict:
         """Get project directory structure."""
         project_path = self.projects_path / project_id

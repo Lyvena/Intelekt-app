@@ -318,6 +318,173 @@ EXPLANATION:
         
         return result
 
+    async def generate_project_files(
+        self,
+        prompt: str,
+        tech_stack: str,
+        provider: AIProvider,
+        context: Optional[str] = None
+    ) -> Dict:
+        """Generate multiple files for a complete project."""
+        
+        # Build multi-file generation prompt
+        project_prompt = f"""Generate a complete project with multiple files for the following requirement:
+
+Requirement: {prompt}
+
+Tech Stack: {tech_stack}
+
+{f"Additional Context: {context}" if context else ""}
+
+Generate ALL necessary files for a complete, working project. For web apps, include HTML, CSS, and JavaScript files.
+
+IMPORTANT: Format your response EXACTLY as follows, with each file clearly marked:
+
+===FILE: <filepath>===
+<complete file content>
+===END_FILE===
+
+===FILE: <filepath>===
+<complete file content>
+===END_FILE===
+
+DEPENDENCIES:
+<list of npm/pip packages needed, one per line>
+
+EXPLANATION:
+<brief explanation of the project structure>
+
+Example format:
+===FILE: index.html===
+<!DOCTYPE html>
+<html>...</html>
+===END_FILE===
+
+===FILE: style.css===
+body {{ margin: 0; }}
+===END_FILE===
+
+===FILE: app.js===
+console.log('Hello');
+===END_FILE===
+
+Generate complete, production-ready code for each file. Include:
+- index.html (main HTML file)
+- style.css or styles.css (styling)
+- app.js, script.js, or main.js (JavaScript logic)
+- Any additional files needed for the project
+
+Start generating the files now:
+"""
+        
+        messages = [ChatMessage(role="user", content=project_prompt)]
+        response = await self.generate_response(messages, provider, max_tokens=8192)
+        
+        # Parse multi-file response
+        return self._parse_multi_file_response(response)
+    
+    def _parse_multi_file_response(self, response: str) -> Dict:
+        """Parse AI response to extract multiple files."""
+        import re
+        
+        result = {
+            "files": [],
+            "dependencies": [],
+            "explanation": ""
+        }
+        
+        # Extract files using regex pattern
+        file_pattern = r'===FILE:\s*([^=]+)===\s*([\s\S]*?)===END_FILE==='
+        matches = re.findall(file_pattern, response)
+        
+        for filepath, content in matches:
+            filepath = filepath.strip()
+            content = content.strip()
+            
+            # Remove markdown code blocks if present
+            if content.startswith('```'):
+                lines = content.split('\n')
+                # Remove first line (```language)
+                lines = lines[1:]
+                # Remove last line if it's ```
+                if lines and lines[-1].strip() == '```':
+                    lines = lines[:-1]
+                content = '\n'.join(lines)
+            
+            if filepath and content:
+                result["files"].append({
+                    "path": filepath,
+                    "content": content
+                })
+        
+        # Extract dependencies
+        deps_match = re.search(r'DEPENDENCIES:\s*([\s\S]*?)(?:EXPLANATION:|$)', response)
+        if deps_match:
+            deps_text = deps_match.group(1).strip()
+            deps = [d.strip() for d in deps_text.split('\n') if d.strip() and not d.startswith('-')]
+            # Also handle dash-prefixed items
+            deps += [d.strip().lstrip('-').strip() for d in deps_text.split('\n') if d.strip().startswith('-')]
+            result["dependencies"] = [d for d in deps if d]
+        
+        # Extract explanation
+        explanation_match = re.search(r'EXPLANATION:\s*([\s\S]*?)$', response)
+        if explanation_match:
+            result["explanation"] = explanation_match.group(1).strip()
+        
+        # Fallback: try to extract code blocks if no files were found
+        if not result["files"]:
+            result["files"] = self._extract_code_blocks_as_files(response)
+        
+        return result
+    
+    def _extract_code_blocks_as_files(self, response: str) -> List[Dict[str, str]]:
+        """Extract code blocks and infer filenames from language hints."""
+        import re
+        
+        files = []
+        
+        # Match markdown code blocks with language
+        code_block_pattern = r'```(\w+)?\s*\n([\s\S]*?)```'
+        matches = re.findall(code_block_pattern, response)
+        
+        extension_map = {
+            'html': 'index.html',
+            'css': 'style.css',
+            'javascript': 'app.js',
+            'js': 'app.js',
+            'python': 'main.py',
+            'py': 'main.py',
+            'json': 'package.json',
+            'typescript': 'app.ts',
+            'ts': 'app.ts',
+            'jsx': 'App.jsx',
+            'tsx': 'App.tsx',
+        }
+        
+        used_names = set()
+        
+        for lang, content in matches:
+            lang = (lang or 'txt').lower()
+            base_name = extension_map.get(lang, f'file.{lang}')
+            
+            # Ensure unique names
+            filename = base_name
+            counter = 1
+            while filename in used_names:
+                name, ext = base_name.rsplit('.', 1)
+                filename = f"{name}_{counter}.{ext}"
+                counter += 1
+            
+            used_names.add(filename)
+            
+            if content.strip():
+                files.append({
+                    "path": filename,
+                    "content": content.strip()
+                })
+        
+        return files
+
 
 # Singleton instance
 ai_service = AIService()

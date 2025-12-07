@@ -119,17 +119,36 @@ export const ChatPanel: React.FC = () => {
                   setProjectFiles(currentProject.id, [...existingFiles, newFile]);
                 }
                 
-                // Show preview automatically for HTML/JS files
+                // Show preview automatically for HTML/JS/CSS files
                 if (data.file_path.endsWith('.html') || data.file_path.endsWith('.js') || data.file_path.endsWith('.css')) {
                   setShowPreview(true);
                 }
                 
+                // Get file extension for syntax highlighting
+                const ext = data.file_path.split('.').pop() || 'txt';
+                const langMap: Record<string, string> = {
+                  'html': 'html', 'css': 'css', 'js': 'javascript', 'ts': 'typescript',
+                  'py': 'python', 'json': 'json', 'jsx': 'jsx', 'tsx': 'tsx'
+                };
+                const lang = langMap[ext] || ext;
+                
                 const codeMessage: ChatMessage = {
                   role: 'assistant',
-                  content: `Generated file: \`${data.file_path}\`\n\n\`\`\`\n${data.code}\n\`\`\``,
+                  content: `📄 Generated: \`${data.file_path}\`\n\n\`\`\`${lang}\n${data.code}\n\`\`\``,
                   timestamp: new Date().toISOString(),
                 };
                 addMessage(currentProject.id, codeMessage);
+              } else if (data.type === 'project_info') {
+                // Handle project generation summary
+                const deps = data.dependencies?.length > 0 
+                  ? `\n\n**Dependencies:** ${data.dependencies.join(', ')}`
+                  : '';
+                const summaryMessage: ChatMessage = {
+                  role: 'assistant',
+                  content: `🎉 **Project Generated!** Created ${data.file_count} files.\n\n${data.explanation}${deps}\n\n*Click the preview button to see your app in action!*`,
+                  timestamp: new Date().toISOString(),
+                };
+                addMessage(currentProject.id, summaryMessage);
               } else if (data.type === 'done') {
                 // Finalize the response
                 if (fullResponse) {
