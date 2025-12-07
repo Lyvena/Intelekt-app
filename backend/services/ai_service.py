@@ -710,6 +710,133 @@ If NO changes are needed, respond with:
         return (has_refinement_verb and (has_element_ref or has_style_keyword)) or \
                (is_short and has_style_keyword and has_element_ref)
 
+    async def fix_errors(
+        self,
+        errors: List[str],
+        existing_files: Dict[str, str],
+        provider: AIProvider
+    ) -> Dict:
+        """
+        Analyze runtime errors and generate fixes.
+        
+        This method enables automatic error detection and fixing by:
+        1. Analyzing the error messages
+        2. Identifying the likely cause in the code
+        3. Generating targeted fixes
+        
+        Args:
+            errors: List of error messages from the runtime
+            existing_files: Dict mapping file paths to their current content
+            provider: AI provider to use
+            
+        Returns:
+            Dict with fixed files and explanation
+        """
+        
+        # Build the context with existing files
+        files_context = "\n\n".join([
+            f"===FILE: {path}===\n{content}\n===END FILE==="
+            for path, content in existing_files.items()
+        ])
+        
+        errors_text = "\n".join([f"- {error}" for error in errors])
+        
+        fix_prompt = f"""You are a debugging expert. The following code has runtime errors that need to be fixed.
+
+CURRENT FILES:
+{files_context}
+
+RUNTIME ERRORS:
+{errors_text}
+
+INSTRUCTIONS:
+1. Analyze each error message carefully
+2. Identify the root cause in the code
+3. Generate fixes that resolve ALL the errors
+4. Preserve all existing functionality
+5. Add error handling where appropriate to prevent similar issues
+
+FORMAT YOUR RESPONSE EXACTLY AS:
+
+===ERROR_ANALYSIS===
+<Explain what's causing each error and why>
+===END_ANALYSIS===
+
+===FIX_SUMMARY===
+<Brief summary of the fixes applied>
+===END_SUMMARY===
+
+===FIXED_FILE: <filepath>===
+<complete fixed file content>
+===END_FILE===
+
+(Repeat for each file that needs fixes. Only include files that were modified.)
+
+If the errors cannot be fixed automatically, respond with:
+===CANNOT_FIX===
+<explanation of why and suggestions for manual fixes>
+===END===
+"""
+        
+        messages = [ChatMessage(role="user", content=fix_prompt)]
+        response = await self.generate_response(messages, provider, max_tokens=8192)
+        
+        return self._parse_fix_response(response, existing_files)
+    
+    def _parse_fix_response(
+        self, 
+        response: str, 
+        existing_files: Dict[str, str]
+    ) -> Dict:
+        """Parse error fix response to extract fixed files."""
+        result = {
+            "analysis": "",
+            "summary": "",
+            "fixed_files": [],
+            "cannot_fix": False,
+            "explanation": ""
+        }
+        
+        # Check for cannot fix response
+        if "===CANNOT_FIX===" in response:
+            result["cannot_fix"] = True
+            match = re.search(r'===CANNOT_FIX===\s*(.*?)\s*===END===', response, re.DOTALL)
+            if match:
+                result["explanation"] = match.group(1).strip()
+            return result
+        
+        # Extract error analysis
+        analysis_match = re.search(r'===ERROR_ANALYSIS===\s*(.*?)\s*===END_ANALYSIS===', response, re.DOTALL)
+        if analysis_match:
+            result["analysis"] = analysis_match.group(1).strip()
+        
+        # Extract fix summary
+        summary_match = re.search(r'===FIX_SUMMARY===\s*(.*?)\s*===END_SUMMARY===', response, re.DOTALL)
+        if summary_match:
+            result["summary"] = summary_match.group(1).strip()
+        
+        # Extract fixed files
+        file_pattern = r'===FIXED_FILE:\s*([^\n=]+)===\s*(.*?)\s*===END_FILE==='
+        matches = re.findall(file_pattern, response, re.DOTALL)
+        
+        for filepath, content in matches:
+            filepath = filepath.strip()
+            content = content.strip()
+            
+            result["fixed_files"].append({
+                "path": filepath,
+                "content": content,
+                "had_errors": True
+            })
+        
+        # If no files were parsed but response contains code, try fallback
+        if not result["fixed_files"] and "```" in response:
+            result["fixed_files"] = self._fallback_refinement_parse(response, existing_files)
+            if not result["summary"]:
+                result["summary"] = "Applied error fixes."
+        
+        return result
+
 
 # Singleton instance
 ai_service = AIService()

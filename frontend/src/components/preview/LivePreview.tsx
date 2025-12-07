@@ -9,13 +9,18 @@ import {
   Terminal,
   ExternalLink,
   Maximize2,
-  Minimize2
+  Minimize2,
+  Wand2,
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 interface LivePreviewProps {
   files: Record<string, string>;
   onClose: () => void;
+  onFixError?: (errors: string[], files: Record<string, string>) => Promise<void>;
+  isFixing?: boolean;
 }
 
 type DeviceSize = 'mobile' | 'tablet' | 'desktop' | 'full';
@@ -27,7 +32,7 @@ const deviceSizes: Record<DeviceSize, { width: string; icon: React.ReactNode; la
   full: { width: '100%', icon: <Maximize2 className="w-4 h-4" />, label: 'Full' },
 };
 
-export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose }) => {
+export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixError, isFixing = false }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [deviceSize, setDeviceSize] = useState<DeviceSize>('full');
   const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string }>>([]);
@@ -319,12 +324,32 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose }) => {
           <div className="w-80 border-l border-border bg-gray-900 flex flex-col">
             <div className="flex items-center justify-between px-3 py-2 border-b border-gray-700">
               <span className="text-sm font-medium text-gray-300">Console</span>
-              <button
-                onClick={() => setConsoleLogs([])}
-                className="text-xs text-gray-400 hover:text-white"
-              >
-                Clear
-              </button>
+              <div className="flex items-center gap-2">
+                {consoleLogs.filter(l => l.type === 'error').length > 0 && onFixError && (
+                  <button
+                    onClick={() => {
+                      const errors = consoleLogs
+                        .filter(l => l.type === 'error')
+                        .map(l => l.message);
+                      onFixError(errors, files);
+                    }}
+                    disabled={isFixing}
+                    className="flex items-center gap-1 px-2 py-1 text-xs bg-red-600 hover:bg-red-700 text-white rounded disabled:opacity-50"
+                  >
+                    {isFixing ? (
+                      <><Loader2 className="w-3 h-3 animate-spin" /> Fixing...</>
+                    ) : (
+                      <><Wand2 className="w-3 h-3" /> Fix Errors</>
+                    )}
+                  </button>
+                )}
+                <button
+                  onClick={() => setConsoleLogs([])}
+                  className="text-xs text-gray-400 hover:text-white"
+                >
+                  Clear
+                </button>
+              </div>
             </div>
             <div className="flex-1 overflow-auto p-2 font-mono text-xs">
               {consoleLogs.length === 0 ? (
@@ -333,9 +358,12 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose }) => {
                 consoleLogs.map((log, index) => (
                   <div 
                     key={index} 
-                    className={cn("py-1 border-b border-gray-800", getLogColor(log.type))}
+                    className={cn("py-1 border-b border-gray-800 flex items-start gap-2", getLogColor(log.type))}
                   >
-                    <span className="text-gray-500">[{log.type}]</span> {log.message}
+                    {log.type === 'error' && <AlertTriangle className="w-3 h-3 mt-0.5 flex-shrink-0" />}
+                    <div>
+                      <span className="text-gray-500">[{log.type}]</span> {log.message}
+                    </div>
                   </div>
                 ))
               )}

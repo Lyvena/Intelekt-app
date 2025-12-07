@@ -2,7 +2,9 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from models.schemas import ChatRequest, ChatResponse, ChatMessage
+from pydantic import BaseModel
+from typing import List, Dict, Optional
+from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
 from services import ai_service, chroma_service, code_generator
 from datetime import datetime
 import json
@@ -299,3 +301,52 @@ def _generate_suggestions(message: str, tech_stack) -> list[str]:
             ])
     
     return suggestions[:3]  # Return top 3 suggestions
+
+
+# Request model for fix errors
+class FixErrorsRequest(BaseModel):
+    errors: List[str]
+    files: Dict[str, str]
+    ai_provider: AIProvider = AIProvider.CLAUDE
+    project_id: Optional[str] = None
+
+
+@router.post("/fix-errors")
+@limiter.limit("10/minute")
+async def fix_errors(request: Request, fix_request: FixErrorsRequest):
+    """
+    Analyze runtime errors and generate fixes.
+    
+    This endpoint takes error messages and current files,
+    then uses AI to analyze and fix the issues.
+    """
+    try:
+        result = await ai_service.fix_errors(
+            errors=fix_request.errors,
+            existing_files=fix_request.files,
+            provider=fix_request.ai_provider
+        )
+        
+        # If we have a project_id, save the fixed files
+        if fix_request.project_id and result.get("fixed_files"):
+            for file_info in result["fixed_files"]:
+                try:
+                    code_generator.save_file(
+                        fix_request.project_id,
+                        file_info["path"],
+                        file_info["content"]
+                    )
+                except Exception as e:
+                    print(f"Failed to save fixed file: {e}")
+        
+        return {
+            "success": not result.get("cannot_fix", False),
+            "analysis": result.get("analysis", ""),
+            "summary": result.get("summary", ""),
+            "fixed_files": result.get("fixed_files", []),
+            "cannot_fix": result.get("cannot_fix", False),
+            "explanation": result.get("explanation", "")
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

@@ -47,6 +47,23 @@ export const chatAPI = {
     const response = await api.post<ChatResponse>('/api/chat', request);
     return response.data;
   },
+
+  fixErrors: async (request: {
+    errors: string[];
+    files: Record<string, string>;
+    ai_provider?: 'claude' | 'grok';
+    project_id?: string;
+  }): Promise<{
+    success: boolean;
+    analysis: string;
+    summary: string;
+    fixed_files: Array<{ path: string; content: string; had_errors: boolean }>;
+    cannot_fix: boolean;
+    explanation: string;
+  }> => {
+    const response = await api.post('/api/chat/fix-errors', request);
+    return response.data;
+  },
 };
 
 export const projectsAPI = {

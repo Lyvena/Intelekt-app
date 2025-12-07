@@ -1,7 +1,7 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 import { useStore, usePreviewFiles } from './store/useStore';
-import { projectsAPI } from './services/api';
+import { projectsAPI, chatAPI } from './services/api';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { FileExplorer } from './components/editor/FileExplorer';
@@ -15,9 +15,52 @@ function App() {
     currentProject, 
     showPreview, 
     setShowPreview,
+    setProjectFiles,
+    projectFiles,
+    aiProvider,
   } = useStore();
   
   const previewFiles = usePreviewFiles();
+  const [isFixingErrors, setIsFixingErrors] = useState(false);
+
+  // Handle error fixing from preview
+  const handleFixErrors = useCallback(async (errors: string[], files: Record<string, string>) => {
+    if (!currentProject) return;
+    
+    setIsFixingErrors(true);
+    try {
+      const result = await chatAPI.fixErrors({
+        errors,
+        files,
+        ai_provider: aiProvider,
+        project_id: currentProject.id,
+      });
+      
+      if (result.success && result.fixed_files.length > 0) {
+        // Update project files with fixes
+        const existingFiles = projectFiles[currentProject.id] || [];
+        const updatedFiles = [...existingFiles];
+        
+        for (const fixedFile of result.fixed_files) {
+          const existingIndex = updatedFiles.findIndex(f => f.path === fixedFile.path);
+          if (existingIndex >= 0) {
+            updatedFiles[existingIndex] = { path: fixedFile.path, content: fixedFile.content };
+          } else {
+            updatedFiles.push({ path: fixedFile.path, content: fixedFile.content });
+          }
+        }
+        
+        setProjectFiles(currentProject.id, updatedFiles);
+        console.log('🔧 Errors fixed:', result.summary);
+      } else if (result.cannot_fix) {
+        console.warn('Could not fix errors:', result.explanation);
+      }
+    } catch (error) {
+      console.error('Failed to fix errors:', error);
+    } finally {
+      setIsFixingErrors(false);
+    }
+  }, [currentProject, aiProvider, projectFiles, setProjectFiles]);
 
   useEffect(() => {
     const loadProjects = async () => {
@@ -80,6 +123,8 @@ function App() {
         <LivePreview
           files={previewFiles}
           onClose={() => setShowPreview(false)}
+          onFixError={handleFixErrors}
+          isFixing={isFixingErrors}
         />
       )}
     </div>
