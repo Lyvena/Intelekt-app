@@ -149,6 +149,65 @@ export const ChatPanel: React.FC = () => {
                   timestamp: new Date().toISOString(),
                 };
                 addMessage(currentProject.id, summaryMessage);
+              } else if (data.type === 'status') {
+                // Status update (e.g., "Refining code...")
+                appendStreamingMessage(`\n\n*${data.message}*`);
+              } else if (data.type === 'refinement_info') {
+                // Handle refinement summary
+                if (data.no_changes) {
+                  const noChangeMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: `ℹ️ **No changes needed:** ${data.explanation}`,
+                    timestamp: new Date().toISOString(),
+                  };
+                  addMessage(currentProject.id, noChangeMessage);
+                } else if (data.summary) {
+                  const summaryMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: `✨ **Changes Applied:** ${data.summary}`,
+                    timestamp: new Date().toISOString(),
+                  };
+                  addMessage(currentProject.id, summaryMessage);
+                }
+              } else if (data.type === 'refined_code') {
+                // Handle refined code - update project files
+                const existingFiles = projectFiles[currentProject.id] || [];
+                const fileExists = existingFiles.some(f => f.path === data.file_path);
+                
+                const newFile = {
+                  path: data.file_path,
+                  content: data.code,
+                };
+                
+                if (fileExists) {
+                  setProjectFiles(
+                    currentProject.id,
+                    existingFiles.map(f => f.path === data.file_path ? newFile : f)
+                  );
+                } else {
+                  setProjectFiles(currentProject.id, [...existingFiles, newFile]);
+                }
+                
+                // Show preview automatically
+                if (data.file_path.endsWith('.html') || data.file_path.endsWith('.js') || data.file_path.endsWith('.css')) {
+                  setShowPreview(true);
+                }
+                
+                // Get file extension for syntax highlighting
+                const ext = data.file_path.split('.').pop() || 'txt';
+                const langMap: Record<string, string> = {
+                  'html': 'html', 'css': 'css', 'js': 'javascript', 'ts': 'typescript',
+                  'py': 'python', 'json': 'json', 'jsx': 'jsx', 'tsx': 'tsx'
+                };
+                const lang = langMap[ext] || ext;
+                
+                const actionLabel = data.is_new ? '📄 Added' : '🔄 Modified';
+                const codeMessage: ChatMessage = {
+                  role: 'assistant',
+                  content: `${actionLabel}: \`${data.file_path}\`\n\n\`\`\`${lang}\n${data.code}\n\`\`\``,
+                  timestamp: new Date().toISOString(),
+                };
+                addMessage(currentProject.id, codeMessage);
               } else if (data.type === 'done') {
                 // Finalize the response
                 if (fullResponse) {

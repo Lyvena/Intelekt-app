@@ -485,6 +485,231 @@ Start generating the files now:
         
         return files
 
+    async def refine_code(
+        self,
+        instruction: str,
+        existing_files: Dict[str, str],
+        provider: AIProvider,
+        conversation_context: Optional[str] = None
+    ) -> Dict:
+        """
+        Refine existing code based on a natural language instruction.
+        
+        This method enables iterative refinement where users can say things like:
+        - "Make the header blue"
+        - "Add a footer with social links"
+        - "Fix the button alignment"
+        - "Make the fonts bigger"
+        
+        Args:
+            instruction: The refinement instruction from the user
+            existing_files: Dict mapping file paths to their current content
+            provider: AI provider to use
+            conversation_context: Previous conversation for context
+            
+        Returns:
+            Dict with modified files and explanation
+        """
+        
+        # Build the context with existing files
+        files_context = "\n\n".join([
+            f"===CURRENT FILE: {path}===\n{content}\n===END FILE==="
+            for path, content in existing_files.items()
+        ])
+        
+        refinement_prompt = f"""You are refining an existing project based on user feedback.
+
+CURRENT PROJECT FILES:
+{files_context}
+
+{f"PREVIOUS CONVERSATION CONTEXT:{chr(10)}{conversation_context}{chr(10)}" if conversation_context else ""}
+
+USER'S REFINEMENT REQUEST:
+{instruction}
+
+IMPORTANT INSTRUCTIONS:
+1. Analyze the request and determine which file(s) need to be modified
+2. Make ONLY the changes necessary to fulfill the request
+3. Preserve all existing functionality and code that doesn't need to change
+4. Keep the same file structure unless the request specifically asks to add/remove files
+
+FORMAT YOUR RESPONSE EXACTLY AS:
+
+===CHANGES_SUMMARY===
+<Brief explanation of what you changed and why>
+===END_SUMMARY===
+
+===MODIFIED_FILE: <filepath>===
+<complete updated file content>
+===END_FILE===
+
+(Repeat for each file that needs changes. Only include files that were modified.)
+
+If NO changes are needed, respond with:
+===NO_CHANGES===
+<explanation of why no changes are needed>
+===END===
+"""
+        
+        messages = [ChatMessage(role="user", content=refinement_prompt)]
+        response = await self.generate_response(messages, provider, max_tokens=8192)
+        
+        return self._parse_refinement_response(response, existing_files)
+    
+    def _parse_refinement_response(
+        self, 
+        response: str, 
+        existing_files: Dict[str, str]
+    ) -> Dict:
+        """Parse refinement response to extract modified files."""
+        result = {
+            "summary": "",
+            "modified_files": [],
+            "no_changes": False,
+            "explanation": ""
+        }
+        
+        # Check for no changes response
+        if "===NO_CHANGES===" in response:
+            result["no_changes"] = True
+            match = re.search(r'===NO_CHANGES===\s*(.*?)\s*===END===', response, re.DOTALL)
+            if match:
+                result["explanation"] = match.group(1).strip()
+            return result
+        
+        # Extract summary
+        summary_match = re.search(r'===CHANGES_SUMMARY===\s*(.*?)\s*===END_SUMMARY===', response, re.DOTALL)
+        if summary_match:
+            result["summary"] = summary_match.group(1).strip()
+        
+        # Extract modified files
+        file_pattern = r'===MODIFIED_FILE:\s*([^\n=]+)===\s*(.*?)\s*===END_FILE==='
+        matches = re.findall(file_pattern, response, re.DOTALL)
+        
+        for filepath, content in matches:
+            filepath = filepath.strip()
+            content = content.strip()
+            
+            # Track if this is actually a modification
+            is_new = filepath not in existing_files
+            
+            result["modified_files"].append({
+                "path": filepath,
+                "content": content,
+                "is_new": is_new
+            })
+        
+        # If no files were parsed but response contains code, try fallback parsing
+        if not result["modified_files"] and "```" in response:
+            result["modified_files"] = self._fallback_refinement_parse(response, existing_files)
+            if not result["summary"]:
+                result["summary"] = "Applied requested changes."
+        
+        return result
+    
+    def _fallback_refinement_parse(
+        self, 
+        response: str, 
+        existing_files: Dict[str, str]
+    ) -> List[Dict]:
+        """Fallback parser when structured format isn't followed."""
+        files = []
+        
+        # Try to match code blocks with filenames in comments or nearby text
+        code_pattern = r'```(\w+)?\s*\n(.*?)```'
+        matches = re.findall(code_pattern, response, re.DOTALL)
+        
+        if not matches:
+            return files
+        
+        # Map languages to likely files from existing project
+        lang_to_existing = {}
+        for path in existing_files.keys():
+            ext = path.rsplit('.', 1)[-1].lower()
+            lang_map = {
+                'html': ['html'],
+                'css': ['css', 'scss', 'sass'],
+                'js': ['javascript', 'js'],
+                'ts': ['typescript', 'ts'],
+                'py': ['python', 'py'],
+                'json': ['json'],
+            }
+            for lang, aliases in lang_map.items():
+                if ext == lang:
+                    for alias in aliases:
+                        lang_to_existing[alias] = path
+        
+        for lang, content in matches:
+            lang = (lang or '').lower()
+            
+            # Try to find matching existing file
+            if lang in lang_to_existing:
+                files.append({
+                    "path": lang_to_existing[lang],
+                    "content": content.strip(),
+                    "is_new": False
+                })
+            elif content.strip():
+                # Create new file based on language
+                ext_map = {'javascript': 'js', 'typescript': 'ts', 'python': 'py'}
+                ext = ext_map.get(lang, lang) if lang else 'txt'
+                files.append({
+                    "path": f"modified.{ext}",
+                    "content": content.strip(),
+                    "is_new": True
+                })
+        
+        return files
+
+    def is_refinement_request(self, message: str, has_existing_files: bool) -> bool:
+        """
+        Detect if a message is a refinement request vs. a new generation request.
+        
+        Refinement requests typically:
+        - Reference existing elements ("the header", "that button", "the footer")
+        - Use modification verbs ("change", "fix", "update", "make", "adjust")
+        - Are short and conversational
+        """
+        if not has_existing_files:
+            return False
+        
+        message_lower = message.lower()
+        
+        # Keywords that suggest refinement
+        refinement_verbs = [
+            'change', 'fix', 'update', 'make', 'adjust', 'modify', 
+            'tweak', 'improve', 'align', 'center', 'move', 'resize',
+            'recolor', 'restyle', 'add padding', 'add margin', 'remove',
+            'hide', 'show', 'increase', 'decrease', 'bigger', 'smaller'
+        ]
+        
+        # References to existing elements
+        element_references = [
+            'the header', 'the footer', 'the button', 'the nav', 
+            'the sidebar', 'the menu', 'the form', 'the input',
+            'the title', 'the text', 'the image', 'the logo',
+            'the card', 'the container', 'the section', 'the div',
+            'that', 'this', 'it'
+        ]
+        
+        # Color and style changes
+        style_keywords = [
+            'blue', 'red', 'green', 'black', 'white', 'dark', 'light',
+            'bold', 'italic', 'larger', 'smaller', 'centered', 'left',
+            'right', 'top', 'bottom', 'rounded', 'shadow', 'border'
+        ]
+        
+        # Check for refinement patterns
+        has_refinement_verb = any(verb in message_lower for verb in refinement_verbs)
+        has_element_ref = any(ref in message_lower for ref in element_references)
+        has_style_keyword = any(kw in message_lower for kw in style_keywords)
+        
+        # Short messages with style keywords are likely refinements
+        is_short = len(message.split()) < 15
+        
+        return (has_refinement_verb and (has_element_ref or has_style_keyword)) or \
+               (is_short and has_style_keyword and has_element_ref)
+
 
 # Singleton instance
 ai_service = AIService()

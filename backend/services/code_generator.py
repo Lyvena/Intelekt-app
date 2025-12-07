@@ -180,6 +180,44 @@ class CodeGeneratorService:
         
         return None
     
+    def save_file(self, project_id: str, file_path: str, content: str) -> Dict:
+        """
+        Save a file to a project.
+        
+        Args:
+            project_id: The project ID
+            file_path: Relative path for the file
+            content: File content to save
+            
+        Returns:
+            Dict with file_path and success status
+        """
+        project = self.get_project(project_id)
+        if not project:
+            raise ValueError(f"Project {project_id} not found")
+        
+        project_path = self.projects_path / project_id
+        full_path = project_path / file_path
+        
+        # Create parent directories if needed
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        # Write file
+        with open(full_path, "w") as f:
+            f.write(content)
+        
+        # Update project files list
+        if file_path not in project.files:
+            project.files.append(file_path)
+        
+        project.updated_at = datetime.now()
+        self._save_project_metadata(project)
+        
+        return {
+            "file_path": file_path,
+            "success": True
+        }
+    
     def _save_project_metadata(self, project: Project):
         """Save project metadata to disk."""
         project_path = self.projects_path / project.id

@@ -138,6 +138,19 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     role="assistant"
                 )
             
+            # Get existing project files for context
+            existing_files = {}
+            if chat_request.project_id:
+                try:
+                    project_files = code_generator.get_project_files(chat_request.project_id)
+                    existing_files = {f["path"]: f["content"] for f in project_files}
+                except Exception:
+                    pass
+            
+            # Check if this is a refinement request
+            has_existing_files = len(existing_files) > 0
+            is_refinement = ai_service.is_refinement_request(chat_request.message, has_existing_files)
+            
             # Check for code generation
             code_keywords = ["create", "generate", "build", "make", "write", "add", "implement"]
             project_keywords = ["app", "application", "website", "project", "page", "todo", "dashboard", "landing", "portfolio", "game", "calculator", "form"]
@@ -146,7 +159,47 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
             should_generate = chat_request.project_id and any(keyword in message_lower for keyword in code_keywords)
             is_project_request = any(keyword in message_lower for keyword in project_keywords)
             
-            if should_generate:
+            if is_refinement and has_existing_files:
+                # Handle refinement request
+                try:
+                    yield f"data: {json.dumps({'type': 'status', 'message': 'Refining code...'})}\n\n"
+                    
+                    # Get conversation context
+                    conversation_context = "\n".join([
+                        f"{m.role}: {m.content}" 
+                        for m in messages[-5:]
+                    ])
+                    
+                    result = await ai_service.refine_code(
+                        instruction=chat_request.message,
+                        existing_files=existing_files,
+                        provider=chat_request.ai_provider,
+                        conversation_context=conversation_context
+                    )
+                    
+                    if result.get("no_changes"):
+                        yield f"data: {json.dumps({'type': 'refinement_info', 'no_changes': True, 'explanation': result.get('explanation', 'No changes needed.')})}\n\n"
+                    else:
+                        # Send summary
+                        if result.get("summary"):
+                            yield f"data: {json.dumps({'type': 'refinement_info', 'summary': result['summary']})}\n\n"
+                        
+                        # Send modified files
+                        for file_info in result.get("modified_files", []):
+                            # Save the file
+                            code_generator.save_file(
+                                chat_request.project_id,
+                                file_info["path"],
+                                file_info["content"]
+                            )
+                            
+                            yield f"data: {json.dumps({'type': 'refined_code', 'code': file_info['content'], 'file_path': file_info['path'], 'is_new': file_info.get('is_new', False)})}\n\n"
+                
+                except Exception as e:
+                    print(f"Refinement failed: {e}")
+                    yield f"data: {json.dumps({'type': 'error', 'error': f'Refinement failed: {str(e)}'})}\n\n"
+            
+            elif should_generate:
                 try:
                     if is_project_request:
                         # Multi-file project generation
