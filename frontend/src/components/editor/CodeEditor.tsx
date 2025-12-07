@@ -1,7 +1,8 @@
-import React, { useCallback } from 'react';
-import Editor from '@monaco-editor/react';
-import { Save, X, Play } from 'lucide-react';
+import React, { useCallback, useRef, useState } from 'react';
+import Editor, { OnMount } from '@monaco-editor/react';
+import { Save, X, Play, Undo2, Redo2 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import type { editor } from 'monaco-editor';
 
 const getLanguageFromPath = (path: string): string => {
   const ext = path.split('.').pop()?.toLowerCase();
@@ -29,6 +30,39 @@ const getLanguageFromPath = (path: string): string => {
 
 export const CodeEditor: React.FC = () => {
   const { currentProject, currentFile, setCurrentFile, updateFileContent, setShowPreview } = useStore();
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+
+  const handleEditorMount: OnMount = useCallback((editor) => {
+    editorRef.current = editor;
+    
+    // Track undo/redo availability
+    const model = editor.getModel();
+    if (model) {
+      const updateUndoRedo = () => {
+        // Monaco doesn't expose canUndo/canRedo directly, so we track via version
+        setCanUndo(model.getAlternativeVersionId() > 1);
+        setCanRedo(false); // Reset on new changes
+      };
+      
+      model.onDidChangeContent(updateUndoRedo);
+    }
+  }, []);
+
+  const handleUndo = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.trigger('keyboard', 'undo', null);
+      editorRef.current.focus();
+    }
+  }, []);
+
+  const handleRedo = useCallback(() => {
+    if (editorRef.current) {
+      editorRef.current.trigger('keyboard', 'redo', null);
+      editorRef.current.focus();
+    }
+  }, []);
 
   const handleEditorChange = useCallback(
     (value: string | undefined) => {
@@ -77,6 +111,23 @@ export const CodeEditor: React.FC = () => {
         </div>
         <div className="flex items-center gap-1">
           <button
+            onClick={handleUndo}
+            disabled={!canUndo}
+            className="p-1.5 hover:bg-accent rounded disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Undo (Ctrl+Z)"
+          >
+            <Undo2 className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleRedo}
+            disabled={!canRedo}
+            className="p-1.5 hover:bg-accent rounded disabled:opacity-40 disabled:cursor-not-allowed"
+            title="Redo (Ctrl+Y)"
+          >
+            <Redo2 className="w-4 h-4" />
+          </button>
+          <div className="w-px h-4 bg-border mx-1" />
+          <button
             onClick={handleRunPreview}
             className="p-1.5 hover:bg-accent rounded text-green-500"
             title="Run preview"
@@ -107,6 +158,7 @@ export const CodeEditor: React.FC = () => {
           language={language}
           value={currentFile.content}
           onChange={handleEditorChange}
+          onMount={handleEditorMount}
           theme="vs-dark"
           options={{
             minimap: { enabled: true },
