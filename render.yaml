@@ -24,6 +24,8 @@ services:
         sync: false
       - key: XAI_API_KEY
         sync: false
+      - key: SECRET_KEY
+        generateValue: true
     disk:
       name: intelekt-data
       mountPath: /data

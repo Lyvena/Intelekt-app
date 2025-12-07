@@ -25,12 +25,11 @@ COPY backend/ .
 # Create necessary directories
 RUN mkdir -p data/chromadb generated_projects
 
-# Expose port
-EXPOSE 8000
+# Expose port (Render uses PORT env var, default 8080)
+EXPOSE 8080
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')"
+# Set default port
+ENV PORT=8080
 
-# Run the application
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Run the application using shell form to expand $PORT
+CMD uvicorn main:app --host 0.0.0.0 --port $PORT
