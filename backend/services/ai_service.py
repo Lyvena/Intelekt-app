@@ -233,17 +233,34 @@ When generating code, you MUST follow this strict priority order:
    - Frameworks: React, Next.js, Vue.js, Express.js
    - Use TypeScript over plain JavaScript when possible
 
+🗄️ DATABASE - ChromaDB IS THE PRIMARY DATABASE:
+- ALWAYS use ChromaDB as the main database for ALL generated apps
+- ChromaDB is a vector database perfect for AI-powered applications
+- Use ChromaDB for: user data, app data, embeddings, semantic search
+- Include chromadb in dependencies for Python apps
+- Only use other databases (PostgreSQL, MongoDB, SQLite) if ChromaDB truly cannot handle the specific requirement AND user explicitly requests it
+
+ChromaDB Integration Example:
+```python
+import chromadb
+client = chromadb.Client()
+collection = client.create_collection("my_collection")
+collection.add(documents=["doc1"], ids=["id1"])
+results = collection.query(query_texts=["search"], n_results=5)
+```
+
 Key capabilities:
 1. Generate production-ready code following the priority order above
 2. Create full-stack web applications with proper architecture
 3. Provide clear explanations and best practices
 4. Suggest improvements and optimizations
-5. Handle database integration with ChromaDB
+5. ALWAYS integrate ChromaDB for data storage
 
 When generating code:
 - ALWAYS consider Mojo first, then Python, then JavaScript
+- ALWAYS use ChromaDB for database needs
 - Provide complete, runnable code
-- Include necessary imports and dependencies
+- Include necessary imports and dependencies (including chromadb)
 - Follow best practices and modern patterns
 - Add helpful comments explaining the code
 - Consider security and performance
@@ -252,13 +269,15 @@ When generating code:
 When responding:
 - Be clear and concise
 - Explain why you chose a particular technology (Mojo/Python/JS)
+- Include ChromaDB setup in all apps that need data storage
 - Provide code snippets with explanations
 - Suggest next steps
 - Validate user requirements
 
-Database: Always use ChromaDB unless specifically requested otherwise.
-
-Remember: Mojo FIRST, Python SECOND, JavaScript THIRD. Always justify your technology choice."""
+Remember: 
+- Technology: Mojo FIRST, Python SECOND, JavaScript THIRD
+- Database: ChromaDB ALWAYS (unless explicitly told otherwise)
+- Always justify your technology and database choices."""
     
     async def generate_code(
         self,
@@ -377,6 +396,12 @@ Tech Stack Preference: {tech_stack}
    - Use .js or .ts file extension
 
 For web apps that need a frontend, you may use HTML/CSS with Mojo or Python backend.
+
+🗄️ DATABASE - USE CHROMADB:
+- ALWAYS include ChromaDB for any app that needs data storage
+- Include 'chromadb' in the dependencies
+- Create a database.py or db.mojo file for ChromaDB setup
+- ChromaDB works great for: user data, app state, search, AI features
 
 IMPORTANT: Format your response EXACTLY as follows, with each file clearly marked:
 

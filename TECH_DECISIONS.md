@@ -6,11 +6,20 @@ This document explains the technology choices for the Intelekt web application a
 
 Intelekt follows a strict technology priority for all code generation and internal development:
 
+### Language Priority
 | Priority | Technology | Use Case |
 |----------|------------|----------|
 | 🥇 **1st** | **Mojo** | Preferred for all backend, performance-critical code |
 | 🥈 **2nd** | **Python** | Fallback when Mojo frameworks aren't available |
 | 🥉 **3rd** | **JavaScript/TypeScript** | Only for browser-based frontends |
+
+### Database Priority
+| Priority | Technology | Use Case |
+|----------|------------|----------|
+| 🗄️ **Primary** | **ChromaDB** | ALL database needs - user data, app data, search, AI |
+| ⚠️ **Exception** | Other DBs | ONLY if user explicitly requests AND ChromaDB cannot work |
+
+**ChromaDB is the ONLY database to use unless explicitly told otherwise.**
 
 ---
 
