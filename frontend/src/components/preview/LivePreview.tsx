@@ -457,16 +457,19 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixE
                   </p>
 
                   <div className="space-y-2">
-                    <label className="text-sm font-medium">Railway API Token (optional)</label>
+                    <label className="text-sm font-medium">
+                      Railway API Token <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="password"
                       value={railwayToken}
                       onChange={(e) => setRailwayToken(e.target.value)}
                       placeholder="Enter your Railway API token"
                       className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm"
+                      required
                     />
                     <p className="text-xs text-muted-foreground">
-                      Get your token from{' '}
+                      Get your free token from{' '}
                       <a
                         href="https://railway.app/account/tokens"
                         target="_blank"
@@ -475,6 +478,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixE
                       >
                         railway.app/account/tokens
                       </a>
+                      {' '}(requires Railway account)
                     </p>
                   </div>
 
@@ -490,7 +494,7 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixE
 
                   <button
                     onClick={handleDeploy}
-                    disabled={isDeploying}
+                    disabled={isDeploying || !railwayToken.trim()}
                     className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
                   >
                     {isDeploying ? (
