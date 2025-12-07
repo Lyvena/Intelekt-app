@@ -12,8 +12,12 @@ import {
   Minimize2,
   Wand2,
   AlertTriangle,
-  Loader2
+  Loader2,
+  Rocket,
+  CheckCircle,
+  ExternalLink as LinkIcon
 } from 'lucide-react';
+import { deployAPI } from '../../services/api';
 import { cn } from '../../lib/utils';
 
 interface LivePreviewProps {
@@ -21,6 +25,7 @@ interface LivePreviewProps {
   onClose: () => void;
   onFixError?: (errors: string[], files: Record<string, string>) => Promise<void>;
   isFixing?: boolean;
+  projectName?: string;
 }
 
 type DeviceSize = 'mobile' | 'tablet' | 'desktop' | 'full';
@@ -32,12 +37,47 @@ const deviceSizes: Record<DeviceSize, { width: string; icon: React.ReactNode; la
   full: { width: '100%', icon: <Maximize2 className="w-4 h-4" />, label: 'Full' },
 };
 
-export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixError, isFixing = false }) => {
+export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixError, isFixing = false, projectName = 'my-app' }) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [deviceSize, setDeviceSize] = useState<DeviceSize>('full');
   const [consoleLogs, setConsoleLogs] = useState<Array<{ type: string; message: string }>>([]);
   const [showConsole, setShowConsole] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
+  const [deployResult, setDeployResult] = useState<{
+    success: boolean;
+    url?: string;
+    dashboard_url?: string;
+    error?: string;
+  } | null>(null);
+  const [showDeployModal, setShowDeployModal] = useState(false);
+  const [railwayToken, setRailwayToken] = useState('');
+
+  const handleDeploy = async () => {
+    setIsDeploying(true);
+    setDeployResult(null);
+    
+    try {
+      const result = await deployAPI.deployToRailway({
+        project_name: projectName.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+        files,
+        railway_token: railwayToken || undefined,
+      });
+      
+      setDeployResult({
+        success: result.success,
+        url: result.url,
+        dashboard_url: result.dashboard_url,
+      });
+    } catch (error) {
+      setDeployResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Deployment failed',
+      });
+    } finally {
+      setIsDeploying(false);
+    }
+  };
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
 
   // Build the HTML document from files
@@ -288,6 +328,23 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixE
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
+
+          <div className="w-px h-6 bg-border mx-1" />
+          
+          {/* Deploy Button */}
+          <button
+            onClick={() => setShowDeployModal(true)}
+            disabled={isDeploying}
+            className="flex items-center gap-2 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+            title="Deploy to Railway"
+          >
+            {isDeploying ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Rocket className="w-4 h-4" />
+            )}
+            <span className="text-sm font-medium">Deploy</span>
+          </button>
           
           <button
             onClick={onClose}
@@ -371,6 +428,139 @@ export const LivePreview: React.FC<LivePreviewProps> = ({ files, onClose, onFixE
           </div>
         )}
       </div>
+
+      {/* Deploy Modal */}
+      {showDeployModal && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-card border border-border rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-border">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Rocket className="w-5 h-5 text-green-500" />
+                Deploy to Railway
+              </h3>
+              <button
+                onClick={() => {
+                  setShowDeployModal(false);
+                  setDeployResult(null);
+                }}
+                className="p-1 hover:bg-accent rounded"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {!deployResult ? (
+                <>
+                  <p className="text-sm text-muted-foreground">
+                    Deploy your app to Railway with one click. Your app will be live in minutes!
+                  </p>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Railway API Token (optional)</label>
+                    <input
+                      type="password"
+                      value={railwayToken}
+                      onChange={(e) => setRailwayToken(e.target.value)}
+                      placeholder="Enter your Railway API token"
+                      className="w-full px-3 py-2 bg-secondary border border-border rounded-lg text-sm"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Get your token from{' '}
+                      <a
+                        href="https://railway.app/account/tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-primary hover:underline"
+                      >
+                        railway.app/account/tokens
+                      </a>
+                    </p>
+                  </div>
+
+                  <div className="bg-secondary/50 rounded-lg p-3">
+                    <p className="text-xs text-muted-foreground">
+                      <strong>Files to deploy:</strong> {Object.keys(files).length} files
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {Object.keys(files).slice(0, 5).join(', ')}
+                      {Object.keys(files).length > 5 && ` +${Object.keys(files).length - 5} more`}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={handleDeploy}
+                    disabled={isDeploying}
+                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {isDeploying ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Deploying...
+                      </>
+                    ) : (
+                      <>
+                        <Rocket className="w-4 h-4" />
+                        Deploy Now
+                      </>
+                    )}
+                  </button>
+                </>
+              ) : deployResult.success ? (
+                <div className="text-center space-y-4">
+                  <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
+                  <div>
+                    <h4 className="font-semibold text-lg">Deployment Started!</h4>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Your app is being deployed to Railway.
+                    </p>
+                  </div>
+
+                  {deployResult.url && (
+                    <a
+                      href={deployResult.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90"
+                    >
+                      <LinkIcon className="w-4 h-4" />
+                      Open App
+                    </a>
+                  )}
+
+                  {deployResult.dashboard_url && (
+                    <a
+                      href={deployResult.dashboard_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      <ExternalLink className="w-4 h-4" />
+                      View in Railway Dashboard
+                    </a>
+                  )}
+                </div>
+              ) : (
+                <div className="text-center space-y-4">
+                  <AlertTriangle className="w-12 h-12 text-red-500 mx-auto" />
+                  <div>
+                    <h4 className="font-semibold text-lg">Deployment Failed</h4>
+                    <p className="text-sm text-red-400 mt-1">
+                      {deployResult.error || 'An error occurred during deployment.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setDeployResult(null)}
+                    className="px-4 py-2 bg-secondary hover:bg-accent rounded-lg transition-colors"
+                  >
+                    Try Again
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

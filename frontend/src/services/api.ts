@@ -66,6 +66,82 @@ export const chatAPI = {
   },
 };
 
+export const deployAPI = {
+  // Check deployment service status
+  status: async (): Promise<{
+    railway_configured: boolean;
+    supported_platforms: string[];
+  }> => {
+    const response = await api.get('/api/deploy/status');
+    return response.data;
+  },
+
+  // Deploy files to Railway
+  deployToRailway: async (request: {
+    project_name: string;
+    files: Record<string, string>;
+    railway_token?: string;
+  }): Promise<{
+    success: boolean;
+    project_id: string;
+    project_name: string;
+    deployment_id?: string;
+    url?: string;
+    status: string;
+    dashboard_url: string;
+  }> => {
+    const response = await api.post('/api/deploy/railway', request);
+    return response.data;
+  },
+
+  // Deploy existing project to Railway
+  deployProjectToRailway: async (
+    projectId: string,
+    railwayToken?: string
+  ): Promise<{
+    success: boolean;
+    project_id: string;
+    url?: string;
+    dashboard_url: string;
+  }> => {
+    const response = await api.post(`/api/deploy/railway/project/${projectId}`, {
+      project_id: projectId,
+      railway_token: railwayToken,
+    });
+    return response.data;
+  },
+
+  // Get deployment status
+  getDeploymentStatus: async (
+    deploymentId: string,
+    railwayToken?: string
+  ): Promise<{
+    id: string;
+    status: string;
+    url?: string;
+  }> => {
+    const response = await api.get(
+      `/api/deploy/railway/status/${deploymentId}`,
+      { params: { railway_token: railwayToken } }
+    );
+    return response.data;
+  },
+
+  // Prepare files for deployment (get configs)
+  prepareDeployment: async (request: {
+    project_name: string;
+    files: Record<string, string>;
+  }): Promise<{
+    files: Record<string, string>;
+    instructions: string;
+    file_count: number;
+    added_files: string[];
+  }> => {
+    const response = await api.post('/api/deploy/prepare', request);
+    return response.data;
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);

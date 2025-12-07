@@ -125,6 +125,7 @@ function App() {
           onClose={() => setShowPreview(false)}
           onFixError={handleFixErrors}
           isFixing={isFixingErrors}
+          projectName={currentProject?.name || 'my-app'}
         />
       )}
     </div>
