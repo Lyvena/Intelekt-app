@@ -5,7 +5,7 @@ import { projectsAPI } from './services/api';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { FileExplorer } from './components/editor/FileExplorer';
-import { CodeEditor } from './components/editor/CodeEditor';
+import { CollaborativeEditor } from './components/editor/CollaborativeEditor';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { LivePreview } from './components/preview/LivePreview';
 
@@ -60,9 +60,9 @@ function App() {
 
                 <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
 
-                {/* Code Editor */}
+                {/* Code Editor with Collaboration */}
                 <Panel defaultSize={75} minSize={40}>
-                  <CodeEditor />
+                  <CollaborativeEditor />
                 </Panel>
               </PanelGroup>
             </Panel>

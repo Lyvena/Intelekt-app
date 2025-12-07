@@ -8,6 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from routes import chat_router, projects_router
 from routes.auth import router as auth_router
 from routes.preview import router as preview_router
+from routes.collaboration import router as collab_router
 from config import settings
 from models.database import Base, engine
 import os
@@ -40,6 +41,7 @@ app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(projects_router)
 app.include_router(preview_router)
+app.include_router(collab_router)
 
 
 @app.get("/")
@@ -53,7 +55,8 @@ async def root():
             "auth": "/api/auth",
             "chat": "/api/chat",
             "projects": "/api/projects",
-            "docs": "/docs"
+            "docs": "/docs",
+            "collaboration": "/ws/collab"
         }
     }
 
