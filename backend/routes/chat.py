@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from typing import List, Dict, Optional
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
 from services import ai_service, chroma_service, code_generator
+from services.context_service import context_service
 from datetime import datetime
 import json
 
@@ -112,21 +113,44 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                 )
             ]
             
-            # If project exists, add to context
+            # If project exists, add to context and get project context
+            project_context = None
+            existing_files = {}
+            
             if chat_request.project_id:
                 chroma_service.add_conversation_context(
                     project_id=chat_request.project_id,
                     message=chat_request.message,
                     role="user"
                 )
+                
+                # Get project context for AI awareness
+                project_context = context_service.build_context_prompt(
+                    chat_request.project_id,
+                    include_files=True
+                )
+                
+                # Get existing files for context
+                try:
+                    project_files = code_generator.get_project_files(chat_request.project_id)
+                    existing_files = {f["path"]: f["content"] for f in project_files}
+                    
+                    # Update context with current file structure
+                    context_service.update_file_structure(
+                        chat_request.project_id,
+                        list(existing_files.keys())
+                    )
+                except Exception:
+                    pass
             
             full_response = ""
             
-            # Stream the response
-            async for chunk in ai_service.stream_response(
+            # Stream the response with context awareness
+            async for chunk in ai_service.stream_with_context(
                 messages=messages,
                 provider=chat_request.ai_provider,
-                system_prompt=None,
+                project_context=project_context,
+                existing_files=existing_files if len(existing_files) < 10 else None,
                 max_tokens=4096
             ):
                 full_response += chunk
@@ -139,15 +163,20 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     message=full_response,
                     role="assistant"
                 )
-            
-            # Get existing project files for context
-            existing_files = {}
-            if chat_request.project_id:
-                try:
-                    project_files = code_generator.get_project_files(chat_request.project_id)
-                    existing_files = {f["path"]: f["content"] for f in project_files}
-                except Exception:
-                    pass
+                
+                # Analyze response for technical decisions
+                decisions = context_service.analyze_message_for_decisions(
+                    chat_request.message,
+                    full_response
+                )
+                for decision in decisions:
+                    if decision.get("detected"):
+                        context_service.add_decision(
+                            chat_request.project_id,
+                            decision["type"],
+                            f"AI suggested: {decision['type']} related change",
+                            "Based on conversation"
+                        )
             
             # Check if this is a refinement request
             has_existing_files = len(existing_files) > 0

@@ -4,6 +4,7 @@ import { useStore, useCurrentProjectMessages } from '../../store/useStore';
 import type { ChatMessage } from '../../types';
 import { cn, formatDate } from '../../lib/utils';
 import { MessageContent } from './MessageContent';
+import { Suggestions } from './Suggestions';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -337,6 +338,18 @@ export const ChatPanel: React.FC = () => {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Context-Aware Suggestions */}
+      {!isLoading && !streamingMessage && (
+        <Suggestions
+          projectId={currentProject?.id || null}
+          onSuggestionClick={(suggestion) => {
+            setInputMessage(suggestion);
+            inputRef.current?.focus();
+          }}
+          lastMessage={messages.length > 0 ? messages[messages.length - 1]?.content : undefined}
+        />
+      )}
 
       {/* Input */}
       <div className="p-4 border-t border-border bg-card">

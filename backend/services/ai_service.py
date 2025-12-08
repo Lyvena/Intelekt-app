@@ -279,6 +279,100 @@ Remember:
 - Database: ChromaDB ALWAYS (unless explicitly told otherwise)
 - Always justify your technology and database choices."""
     
+    def build_context_aware_prompt(
+        self,
+        base_prompt: str,
+        project_context: Optional[str] = None,
+        existing_files: Optional[Dict[str, str]] = None
+    ) -> str:
+        """
+        Build a context-aware system prompt.
+        
+        Enhances the base prompt with project context and existing code
+        to enable more relevant, consistent suggestions.
+        """
+        prompt_parts = [base_prompt]
+        
+        if project_context:
+            prompt_parts.append("\n\n" + project_context)
+        
+        if existing_files:
+            prompt_parts.append("\n\n=== EXISTING PROJECT FILES ===")
+            for path, content in list(existing_files.items())[:10]:  # Limit to 10 files
+                # Only include first 100 lines of each file
+                lines = content.split('\n')[:100]
+                truncated = '\n'.join(lines)
+                if len(lines) == 100:
+                    truncated += "\n... (truncated)"
+                prompt_parts.append(f"\n--- {path} ---\n{truncated}")
+            prompt_parts.append("\n=== END FILES ===")
+            
+            prompt_parts.append("""
+CONTEXT-AWARE INSTRUCTIONS:
+- You have access to the existing project files above
+- Maintain consistency with existing code style and patterns
+- Reference and extend existing functionality when appropriate
+- Avoid duplicating code that already exists
+- Suggest improvements to existing code when relevant
+- Keep variable naming and conventions consistent
+""")
+        
+        return "\n".join(prompt_parts)
+    
+    async def generate_with_context(
+        self,
+        messages: List[ChatMessage],
+        provider: AIProvider,
+        project_context: Optional[str] = None,
+        existing_files: Optional[Dict[str, str]] = None,
+        max_tokens: int = 4096
+    ) -> str:
+        """
+        Generate AI response with full project context.
+        
+        This method enables context-aware suggestions by including
+        project structure, previous decisions, and existing code.
+        """
+        base_prompt = self._get_default_system_prompt()
+        context_prompt = self.build_context_aware_prompt(
+            base_prompt,
+            project_context,
+            existing_files
+        )
+        
+        return await self.generate_response(
+            messages,
+            provider,
+            system_prompt=context_prompt,
+            max_tokens=max_tokens
+        )
+    
+    async def stream_with_context(
+        self,
+        messages: List[ChatMessage],
+        provider: AIProvider,
+        project_context: Optional[str] = None,
+        existing_files: Optional[Dict[str, str]] = None,
+        max_tokens: int = 4096
+    ) -> AsyncGenerator[str, None]:
+        """
+        Stream AI response with full project context.
+        """
+        base_prompt = self._get_default_system_prompt()
+        context_prompt = self.build_context_aware_prompt(
+            base_prompt,
+            project_context,
+            existing_files
+        )
+        
+        async for chunk in self.stream_response(
+            messages,
+            provider,
+            system_prompt=context_prompt,
+            max_tokens=max_tokens
+        ):
+            yield chunk
+    
     async def generate_code(
         self,
         prompt: str,

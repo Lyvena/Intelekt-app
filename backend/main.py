@@ -10,6 +10,7 @@ from routes.auth import router as auth_router
 from routes.preview import router as preview_router
 from routes.collaboration import router as collab_router
 from routes.deploy import router as deploy_router
+from routes.context import router as context_router
 from config import settings
 from models.database import Base, engine
 import os
@@ -44,6 +45,7 @@ app.include_router(projects_router)
 app.include_router(preview_router)
 app.include_router(collab_router)
 app.include_router(deploy_router)
+app.include_router(context_router)
 
 
 @app.get("/")

@@ -142,6 +142,60 @@ export const deployAPI = {
   },
 };
 
+export const contextAPI = {
+  // Get project context
+  getContext: async (projectId: string): Promise<{
+    project_id: string;
+    tech_stack: Record<string, string>;
+    file_structure: string[];
+    decisions: Array<{
+      type: string;
+      description: string;
+      rationale: string;
+      timestamp: string;
+    }>;
+    patterns: string[];
+    conversation_summary: string;
+    last_updated: string;
+  }> => {
+    const response = await api.get(`/api/context/${projectId}`);
+    return response.data;
+  },
+
+  // Get context-aware suggestions
+  getSuggestions: async (projectId: string, message?: string): Promise<{
+    suggestions: string[];
+  }> => {
+    const params = message ? { message } : {};
+    const response = await api.get(`/api/context/${projectId}/suggestions`, { params });
+    return response.data;
+  },
+
+  // Update tech stack
+  updateTechStack: async (projectId: string, techStack: Record<string, string>): Promise<void> => {
+    await api.post(`/api/context/${projectId}/tech-stack`, { tech_stack: techStack });
+  },
+
+  // Add a decision
+  addDecision: async (
+    projectId: string,
+    decisionType: string,
+    description: string,
+    rationale?: string
+  ): Promise<void> => {
+    await api.post(`/api/context/${projectId}/decision`, {
+      decision_type: decisionType,
+      description,
+      rationale: rationale || '',
+    });
+  },
+
+  // Clear context
+  clearContext: async (projectId: string): Promise<void> => {
+    await api.delete(`/api/context/${projectId}`);
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);
