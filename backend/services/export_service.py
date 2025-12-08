@@ -1,0 +1,418 @@
+"""
+Export Service for downloading projects and exporting to GitHub.
+
+Features:
+1. Generate ZIP file from project files
+2. Export to GitHub repository
+3. Generate README and project structure
+"""
+
+import io
+import zipfile
+import base64
+import httpx
+from typing import Dict, List, Optional, Tuple
+from datetime import datetime
+from pathlib import Path
+from config import settings
+
+
+class ExportService:
+    """Service for exporting and downloading projects."""
+    
+    def __init__(self):
+        """Initialize export service."""
+        self.projects_path = Path(settings.projects_path)
+    
+    def create_zip(
+        self,
+        files: Dict[str, str],
+        project_name: str,
+        include_readme: bool = True
+    ) -> bytes:
+        """
+        Create a ZIP file from project files.
+        
+        Args:
+            files: Dict of filepath -> content
+            project_name: Name for the project folder in ZIP
+            include_readme: Whether to auto-generate README if missing
+            
+        Returns:
+            ZIP file as bytes
+        """
+        buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+            # Add all project files
+            for filepath, content in files.items():
+                # Normalize path and add to project folder
+                normalized_path = filepath.lstrip('./')
+                archive_path = f"{project_name}/{normalized_path}"
+                zf.writestr(archive_path, content)
+            
+            # Generate README if not present
+            if include_readme and 'README.md' not in files and 'readme.md' not in files:
+                readme = self._generate_readme(project_name, files)
+                zf.writestr(f"{project_name}/README.md", readme)
+            
+            # Generate .gitignore if not present
+            if '.gitignore' not in files:
+                gitignore = self._generate_gitignore(files)
+                zf.writestr(f"{project_name}/.gitignore", gitignore)
+        
+        buffer.seek(0)
+        return buffer.getvalue()
+    
+    def _generate_readme(self, project_name: str, files: Dict[str, str]) -> str:
+        """Generate a README.md for the project."""
+        # Detect project type
+        has_package_json = 'package.json' in files
+        has_requirements = 'requirements.txt' in files
+        has_python = any(f.endswith('.py') for f in files)
+        has_react = any('react' in files.get('package.json', '').lower() for _ in [1])
+        has_html = 'index.html' in files
+        
+        readme = f"""# {project_name}
+
+> Generated with [Intelekt](https://github.com/Lyvena/Intelekt-app) - AI-powered code builder
+
+## 📁 Project Structure
+
+```
+{project_name}/
+"""
+        # Add file tree
+        for filepath in sorted(files.keys()):
+            indent = "  " * filepath.count('/')
+            filename = filepath.split('/')[-1]
+            readme += f"├── {indent}{filename}\n"
+        
+        readme += "```\n\n"
+        
+        # Add setup instructions based on project type
+        readme += "## 🚀 Getting Started\n\n"
+        
+        if has_package_json:
+            readme += """### Prerequisites
+- Node.js 18+ installed
+- npm or yarn
+
+### Installation
+```bash
+npm install
+```
+
+### Development
+```bash
+npm run dev
+```
+
+### Build
+```bash
+npm run build
+```
+"""
+        elif has_requirements:
+            readme += """### Prerequisites
+- Python 3.9+ installed
+- pip
+
+### Installation
+```bash
+pip install -r requirements.txt
+```
+
+### Run
+```bash
+python main.py
+```
+"""
+        elif has_python:
+            readme += """### Prerequisites
+- Python 3.9+ installed
+
+### Run
+```bash
+python main.py
+```
+"""
+        elif has_html:
+            readme += """### Run
+Open `index.html` in your browser, or use a local server:
+```bash
+npx serve .
+```
+"""
+        
+        readme += f"""
+## 📝 License
+
+MIT License
+
+---
+
+*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M')}*
+"""
+        return readme
+    
+    def _generate_gitignore(self, files: Dict[str, str]) -> str:
+        """Generate a .gitignore based on project type."""
+        gitignore_lines = [
+            "# Dependencies",
+            "node_modules/",
+            "__pycache__/",
+            "*.pyc",
+            ".venv/",
+            "venv/",
+            "",
+            "# Build outputs",
+            "dist/",
+            "build/",
+            ".next/",
+            "out/",
+            "",
+            "# Environment",
+            ".env",
+            ".env.local",
+            ".env*.local",
+            "",
+            "# IDE",
+            ".idea/",
+            ".vscode/",
+            "*.swp",
+            "*.swo",
+            ".DS_Store",
+            "",
+            "# Logs",
+            "*.log",
+            "npm-debug.log*",
+            "",
+            "# Testing",
+            "coverage/",
+            ".pytest_cache/",
+        ]
+        
+        return '\n'.join(gitignore_lines)
+    
+    async def export_to_github(
+        self,
+        files: Dict[str, str],
+        repo_name: str,
+        github_token: str,
+        description: str = "",
+        private: bool = False,
+        branch: str = "main"
+    ) -> Tuple[bool, str, Optional[str]]:
+        """
+        Export project to a new GitHub repository.
+        
+        Args:
+            files: Dict of filepath -> content
+            repo_name: Name for the new repository
+            github_token: GitHub personal access token
+            description: Repository description
+            private: Whether to create a private repo
+            branch: Branch name (default: main)
+            
+        Returns:
+            Tuple of (success, message, repo_url)
+        """
+        headers = {
+            "Authorization": f"token {github_token}",
+            "Accept": "application/vnd.github.v3+json",
+            "X-GitHub-Api-Version": "2022-11-28"
+        }
+        
+        async with httpx.AsyncClient() as client:
+            # Step 1: Create the repository
+            create_repo_url = "https://api.github.com/user/repos"
+            repo_data = {
+                "name": repo_name,
+                "description": description or f"Created with Intelekt AI",
+                "private": private,
+                "auto_init": False
+            }
+            
+            try:
+                response = await client.post(
+                    create_repo_url,
+                    headers=headers,
+                    json=repo_data,
+                    timeout=30.0
+                )
+                
+                if response.status_code == 422:
+                    return False, "Repository already exists", None
+                elif response.status_code == 401:
+                    return False, "Invalid GitHub token", None
+                elif response.status_code != 201:
+                    return False, f"Failed to create repository: {response.text}", None
+                
+                repo_info = response.json()
+                repo_url = repo_info["html_url"]
+                owner = repo_info["owner"]["login"]
+                
+            except Exception as e:
+                return False, f"Failed to create repository: {str(e)}", None
+            
+            # Step 2: Create initial commit with all files
+            try:
+                # Get the user info
+                user_response = await client.get(
+                    "https://api.github.com/user",
+                    headers=headers
+                )
+                user_data = user_response.json()
+                
+                # Create blobs for each file
+                tree_items = []
+                
+                for filepath, content in files.items():
+                    # Create blob
+                    blob_response = await client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
+                        headers=headers,
+                        json={
+                            "content": base64.b64encode(content.encode()).decode(),
+                            "encoding": "base64"
+                        }
+                    )
+                    
+                    if blob_response.status_code != 201:
+                        continue
+                    
+                    blob_sha = blob_response.json()["sha"]
+                    tree_items.append({
+                        "path": filepath.lstrip('./'),
+                        "mode": "100644",
+                        "type": "blob",
+                        "sha": blob_sha
+                    })
+                
+                # Add README if not present
+                if 'README.md' not in files:
+                    readme_content = self._generate_readme(repo_name, files)
+                    blob_response = await client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
+                        headers=headers,
+                        json={
+                            "content": base64.b64encode(readme_content.encode()).decode(),
+                            "encoding": "base64"
+                        }
+                    )
+                    if blob_response.status_code == 201:
+                        tree_items.append({
+                            "path": "README.md",
+                            "mode": "100644",
+                            "type": "blob",
+                            "sha": blob_response.json()["sha"]
+                        })
+                
+                # Add .gitignore if not present
+                if '.gitignore' not in files:
+                    gitignore_content = self._generate_gitignore(files)
+                    blob_response = await client.post(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/blobs",
+                        headers=headers,
+                        json={
+                            "content": base64.b64encode(gitignore_content.encode()).decode(),
+                            "encoding": "base64"
+                        }
+                    )
+                    if blob_response.status_code == 201:
+                        tree_items.append({
+                            "path": ".gitignore",
+                            "mode": "100644",
+                            "type": "blob",
+                            "sha": blob_response.json()["sha"]
+                        })
+                
+                # Create tree
+                tree_response = await client.post(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/trees",
+                    headers=headers,
+                    json={"tree": tree_items}
+                )
+                
+                if tree_response.status_code != 201:
+                    return False, "Failed to create file tree", repo_url
+                
+                tree_sha = tree_response.json()["sha"]
+                
+                # Create commit
+                commit_response = await client.post(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/commits",
+                    headers=headers,
+                    json={
+                        "message": "Initial commit - Created with Intelekt AI",
+                        "tree": tree_sha,
+                        "author": {
+                            "name": user_data.get("name", user_data["login"]),
+                            "email": user_data.get("email", f"{user_data['login']}@users.noreply.github.com")
+                        }
+                    }
+                )
+                
+                if commit_response.status_code != 201:
+                    return False, "Failed to create commit", repo_url
+                
+                commit_sha = commit_response.json()["sha"]
+                
+                # Create/update ref
+                ref_response = await client.post(
+                    f"https://api.github.com/repos/{owner}/{repo_name}/git/refs",
+                    headers=headers,
+                    json={
+                        "ref": f"refs/heads/{branch}",
+                        "sha": commit_sha
+                    }
+                )
+                
+                if ref_response.status_code not in [201, 200]:
+                    # Try to update existing ref
+                    await client.patch(
+                        f"https://api.github.com/repos/{owner}/{repo_name}/git/refs/heads/{branch}",
+                        headers=headers,
+                        json={"sha": commit_sha, "force": True}
+                    )
+                
+                return True, "Successfully exported to GitHub!", repo_url
+                
+            except Exception as e:
+                return False, f"Failed to push files: {str(e)}", repo_url
+    
+    def get_project_stats(self, files: Dict[str, str]) -> Dict:
+        """Get statistics about the project."""
+        stats = {
+            "total_files": len(files),
+            "total_lines": 0,
+            "total_size_bytes": 0,
+            "file_types": {},
+            "largest_file": None,
+            "largest_file_size": 0
+        }
+        
+        for filepath, content in files.items():
+            # Count lines
+            lines = content.count('\n') + 1
+            stats["total_lines"] += lines
+            
+            # Count size
+            size = len(content.encode('utf-8'))
+            stats["total_size_bytes"] += size
+            
+            # Track largest file
+            if size > stats["largest_file_size"]:
+                stats["largest_file_size"] = size
+                stats["largest_file"] = filepath
+            
+            # Count file types
+            ext = Path(filepath).suffix.lower() or 'no extension'
+            stats["file_types"][ext] = stats["file_types"].get(ext, 0) + 1
+        
+        return stats
+
+
+# Singleton instance
+export_service = ExportService()

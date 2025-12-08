@@ -363,6 +363,72 @@ export const terminalAPI = {
   },
 };
 
+export const exportAPI = {
+  // Download project as ZIP (returns blob URL)
+  downloadZip: async (
+    files: Record<string, string>,
+    projectName: string
+  ): Promise<string> => {
+    const response = await api.post('/api/export/download', {
+      files,
+      project_name: projectName,
+      include_readme: true,
+    }, {
+      responseType: 'blob',
+    });
+    
+    // Create blob URL for download
+    const blob = new Blob([response.data], { type: 'application/zip' });
+    return URL.createObjectURL(blob);
+  },
+
+  // Download existing project by ID
+  downloadProject: async (projectId: string): Promise<string> => {
+    const response = await api.get(`/api/export/download/${projectId}`, {
+      responseType: 'blob',
+    });
+    
+    const blob = new Blob([response.data], { type: 'application/zip' });
+    return URL.createObjectURL(blob);
+  },
+
+  // Export to GitHub
+  exportToGitHub: async (
+    projectId: string,
+    repoName: string,
+    githubToken: string,
+    description?: string,
+    isPrivate?: boolean
+  ): Promise<{
+    success: boolean;
+    message: string;
+    repo_url: string | null;
+  }> => {
+    const response = await api.post('/api/export/github', {
+      project_id: projectId,
+      repo_name: repoName,
+      github_token: githubToken,
+      description: description || '',
+      private: isPrivate || false,
+    });
+    return response.data;
+  },
+
+  // Get project stats
+  getStats: async (projectId: string): Promise<{
+    success: boolean;
+    total_files: number;
+    total_lines: number;
+    total_size_bytes: number;
+    file_types: Record<string, number>;
+    largest_file: string | null;
+    largest_file_size: number;
+  }> => {
+    const response = await api.get(`/api/export/stats/${projectId}`);
+    return response.data;
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);
