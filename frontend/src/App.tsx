@@ -148,47 +148,66 @@ function App() {
 
         {/* Bottom Toolbar */}
         {currentProject && (
-          <div className="h-10 border-t border-border bg-card flex items-center px-2 gap-1">
-            <button
-              onClick={() => toggleBottomPanel('terminal')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-                bottomPanel === 'terminal' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-              }`}
-              title="Terminal"
-            >
-              <Terminal className="w-4 h-4" />
-              Terminal
-            </button>
-            <button
-              onClick={() => toggleBottomPanel('dependencies')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-                bottomPanel === 'dependencies' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-              }`}
-              title="Dependencies"
-            >
-              <Package className="w-4 h-4" />
-              Deps
-            </button>
-            <button
-              onClick={() => toggleBottomPanel('git')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-                bottomPanel === 'git' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-              }`}
-              title="Git"
-            >
-              <GitBranch className="w-4 h-4" />
-              Git
-            </button>
-            <button
-              onClick={() => toggleBottomPanel('export')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs rounded transition-colors ${
-                bottomPanel === 'export' ? 'bg-primary text-primary-foreground' : 'hover:bg-accent'
-              }`}
-              title="Export"
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
+          <div className="h-12 border-t border-border/50 bg-gradient-to-r from-card via-card to-secondary/20 flex items-center px-3 gap-1">
+            {/* Left side - Panel toggles */}
+            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
+              <button
+                onClick={() => toggleBottomPanel('terminal')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'terminal' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Terminal"
+              >
+                <Terminal className="w-4 h-4" />
+                <span className="hidden sm:inline">Terminal</span>
+              </button>
+              <button
+                onClick={() => toggleBottomPanel('dependencies')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'dependencies' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Dependencies"
+              >
+                <Package className="w-4 h-4" />
+                <span className="hidden sm:inline">Deps</span>
+              </button>
+              <button
+                onClick={() => toggleBottomPanel('git')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'git' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Git"
+              >
+                <GitBranch className="w-4 h-4" />
+                <span className="hidden sm:inline">Git</span>
+              </button>
+              <button
+                onClick={() => toggleBottomPanel('export')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'export' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Export"
+              >
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+            </div>
+            
+            {/* Right side - Status */}
+            <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span>Ready</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
