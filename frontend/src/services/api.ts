@@ -196,6 +196,84 @@ export const contextAPI = {
   },
 };
 
+export const dependenciesAPI = {
+  // Analyze dependencies from files
+  analyze: async (files: Record<string, string>): Promise<{
+    success: boolean;
+    project_type: string;
+    python_dependencies: string[];
+    javascript_dependencies: string[];
+    has_package_json: boolean;
+    has_requirements_txt: boolean;
+    recommendations: {
+      required: string[];
+      recommended: string[];
+      optional: string[];
+    };
+  }> => {
+    const response = await api.post('/api/dependencies/analyze', { files });
+    return response.data;
+  },
+
+  // Generate dependency files (package.json, requirements.txt)
+  generate: async (projectName: string, files: Record<string, string>): Promise<{
+    success: boolean;
+    files: Record<string, string>;
+    file_count: number;
+  }> => {
+    const response = await api.post('/api/dependencies/generate', {
+      project_name: projectName,
+      files,
+    });
+    return response.data;
+  },
+
+  // Analyze project dependencies by ID
+  analyzeProject: async (projectId: string): Promise<{
+    success: boolean;
+    project_type: string;
+    python_dependencies: string[];
+    javascript_dependencies: string[];
+    has_package_json: boolean;
+    has_requirements_txt: boolean;
+    recommendations: {
+      required: string[];
+      recommended: string[];
+      optional: string[];
+    };
+  }> => {
+    const response = await api.get(`/api/dependencies/project/${projectId}/analyze`);
+    return response.data;
+  },
+
+  // Generate and save dependency files for a project
+  generateForProject: async (projectId: string): Promise<{
+    success: boolean;
+    generated_files: string[];
+    saved_files: string[];
+    files_content: Record<string, string>;
+  }> => {
+    const response = await api.post(`/api/dependencies/project/${projectId}/generate`);
+    return response.data;
+  },
+
+  // Get dependency suggestions
+  suggest: async (projectType: string, features: string[] = []): Promise<{
+    success: boolean;
+    suggestions: {
+      required: string[];
+      recommended: string[];
+      optional: string[];
+    };
+  }> => {
+    const response = await api.post('/api/dependencies/suggest', {
+      project_type: projectType,
+      features,
+    });
+    return response.data;
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);
