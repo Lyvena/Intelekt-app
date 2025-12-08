@@ -194,6 +194,47 @@ export const contextAPI = {
   clearContext: async (projectId: string): Promise<void> => {
     await api.delete(`/api/context/${projectId}`);
   },
+
+  // Get comprehensive codebase index
+  getCodebaseIndex: async (projectId: string): Promise<{
+    success: boolean;
+    indexed: boolean;
+    project_id?: string;
+    total_files?: number;
+    total_lines?: number;
+    tech_stack?: Record<string, string>;
+    patterns?: string[];
+    entry_points?: string[];
+    files?: Array<{
+      path: string;
+      language: string;
+      lines: number;
+      size: number;
+      components: string[];
+      functions: string[];
+      classes: string[];
+      imports: string[];
+    }>;
+    dependencies?: Record<string, string[]>;
+    indexed_at?: string;
+    message?: string;
+  }> => {
+    const response = await api.get(`/api/context/${projectId}/index`);
+    return response.data;
+  },
+
+  // Get AI context string (for debugging)
+  getAIContext: async (projectId: string, query?: string): Promise<{
+    success: boolean;
+    context?: string;
+    context_length?: number;
+    estimated_tokens?: number;
+    message?: string;
+  }> => {
+    const params = query ? { query } : {};
+    const response = await api.get(`/api/context/${projectId}/ai-context`, { params });
+    return response.data;
+  },
 };
 
 export const dependenciesAPI = {
