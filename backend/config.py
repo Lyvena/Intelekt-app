@@ -3,8 +3,7 @@ from typing import Optional, List
 import os
 
 
-# Parse CORS origins before Settings class
-def get_cors_origins() -> List[str]:
+def _get_cors_origins() -> List[str]:
     """Parse CORS origins from environment or use defaults."""
     env_origins = os.getenv("CORS_ORIGINS", "")
     if env_origins:
@@ -51,5 +50,5 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
-# Add cors_origins as a separate attribute (not a pydantic field)
-settings.cors_origins = get_cors_origins()
+# CORS origins as module-level variable (not on Settings object)
+cors_origins = _get_cors_origins()
