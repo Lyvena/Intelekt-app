@@ -7,6 +7,7 @@ from typing import List, Dict, Optional
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
 from services import ai_service, chroma_service, code_generator
 from services.context_service import context_service
+from services.codebase_indexer import codebase_indexer
 from datetime import datetime
 import json
 
@@ -124,12 +125,6 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     role="user"
                 )
                 
-                # Get project context for AI awareness
-                project_context = context_service.build_context_prompt(
-                    chat_request.project_id,
-                    include_files=True
-                )
-                
                 # Get existing files for context
                 try:
                     project_files = code_generator.get_project_files(chat_request.project_id)
@@ -142,6 +137,23 @@ async def chat_stream(request: Request, chat_request: ChatRequest):
                     )
                 except Exception:
                     pass
+                
+                # Build COMPREHENSIVE AI context using codebase indexer
+                # This gives the AI full understanding of the entire project
+                if existing_files:
+                    project_context = codebase_indexer.build_ai_context(
+                        project_id=chat_request.project_id,
+                        files=existing_files,
+                        user_query=chat_request.message,
+                        max_file_lines=150,  # More context per file
+                        max_files=15  # Include more relevant files
+                    )
+                else:
+                    # Fallback to basic context for new projects
+                    project_context = context_service.build_context_prompt(
+                        chat_request.project_id,
+                        include_files=True
+                    )
             
             full_response = ""
             

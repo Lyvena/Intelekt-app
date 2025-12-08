@@ -6,6 +6,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 from services.context_service import context_service
+from services.codebase_indexer import codebase_indexer
+from services import code_generator
 
 router = APIRouter(prefix="/api/context", tags=["context"])
 
@@ -125,3 +127,124 @@ async def clear_context(project_id: str):
     """Clear all context for a project."""
     context_service.clear_context(project_id)
     return {"success": True, "message": "Context cleared"}
+
+
+@router.get("/{project_id}/index")
+async def get_codebase_index(project_id: str):
+    """
+    Get the full codebase index for a project.
+    
+    This returns comprehensive information about the project:
+    - All files with metadata (lines, language, functions, components)
+    - Detected tech stack
+    - Code patterns
+    - Entry points
+    - Dependency relationships
+    
+    Used by the frontend to show project understanding.
+    """
+    try:
+        # Get project files
+        project_files = code_generator.get_project_files(project_id)
+        if not project_files:
+            return {
+                "success": True,
+                "indexed": False,
+                "message": "No files in project yet"
+            }
+        
+        files = {f["path"]: f["content"] for f in project_files}
+        
+        # Index the codebase
+        index = codebase_indexer.index_project(project_id, files)
+        
+        # Return the summary
+        return {
+            "success": True,
+            "indexed": True,
+            "project_id": project_id,
+            "total_files": index.total_files,
+            "total_lines": index.total_lines,
+            "tech_stack": index.tech_stack,
+            "patterns": index.patterns,
+            "entry_points": index.entry_points,
+            "files": [
+                {
+                    "path": filepath,
+                    "language": info.language,
+                    "lines": info.lines,
+                    "size": info.size,
+                    "components": info.components,
+                    "functions": info.functions[:10],
+                    "classes": info.classes,
+                    "imports": info.imports[:10]
+                }
+                for filepath, info in index.files.items()
+            ],
+            "dependencies": index.dependency_graph,
+            "indexed_at": index.indexed_at.isoformat()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{project_id}/index")
+async def index_codebase(project_id: str, files: Dict[str, str]):
+    """
+    Index a codebase from provided files.
+    
+    This allows the frontend to send files directly for indexing
+    without relying on stored project files.
+    """
+    try:
+        index = codebase_indexer.index_project(project_id, files)
+        
+        return {
+            "success": True,
+            "total_files": index.total_files,
+            "total_lines": index.total_lines,
+            "tech_stack": index.tech_stack,
+            "patterns": index.patterns,
+            "entry_points": index.entry_points
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{project_id}/ai-context")
+async def get_ai_context(project_id: str, query: str = ""):
+    """
+    Get the comprehensive AI context string.
+    
+    This is the full context that gets sent to the AI,
+    including file structure, code content, and patterns.
+    Useful for debugging what the AI sees.
+    """
+    try:
+        # Get project files
+        project_files = code_generator.get_project_files(project_id)
+        if not project_files:
+            return {
+                "success": False,
+                "message": "No files in project"
+            }
+        
+        files = {f["path"]: f["content"] for f in project_files}
+        
+        # Build AI context
+        context = codebase_indexer.build_ai_context(
+            project_id=project_id,
+            files=files,
+            user_query=query,
+            max_file_lines=100,
+            max_files=10
+        )
+        
+        return {
+            "success": True,
+            "context": context,
+            "context_length": len(context),
+            "estimated_tokens": len(context) // 4  # Rough estimate
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
