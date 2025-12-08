@@ -274,6 +274,95 @@ export const dependenciesAPI = {
   },
 };
 
+export const terminalAPI = {
+  // Execute a command (synchronous, waits for completion)
+  execute: async (
+    command: string,
+    projectId: string,
+    timeout: number = 300
+  ): Promise<{
+    success: boolean;
+    id: string;
+    command: string;
+    status: string;
+    exit_code: number | null;
+    output: string[];
+    error: string | null;
+  }> => {
+    const response = await api.post('/api/terminal/execute', {
+      command,
+      project_id: projectId,
+      timeout,
+    });
+    return response.data;
+  },
+
+  // Stream command output (returns EventSource URL)
+  getStreamUrl: (command: string, projectId: string): string => {
+    const params = new URLSearchParams({
+      command,
+      project_id: projectId,
+    });
+    return `${api.defaults.baseURL}/api/terminal/stream?${params}`;
+  },
+
+  // Cancel a running command
+  cancel: async (commandId: string): Promise<{ success: boolean }> => {
+    const response = await api.post(`/api/terminal/cancel/${commandId}`);
+    return response.data;
+  },
+
+  // Get npm scripts for a project
+  getScripts: async (projectId: string): Promise<{
+    success: boolean;
+    scripts: Record<string, string>;
+    script_count: number;
+  }> => {
+    const response = await api.get(`/api/terminal/scripts/${projectId}`);
+    return response.data;
+  },
+
+  // Run an npm script
+  runScript: async (
+    scriptName: string,
+    projectId: string
+  ): Promise<{
+    success: boolean;
+    id: string;
+    script: string;
+    status: string;
+    exit_code: number | null;
+    output: string[];
+    error: string | null;
+  }> => {
+    const response = await api.post('/api/terminal/scripts/run', {
+      script_name: scriptName,
+      project_id: projectId,
+    });
+    return response.data;
+  },
+
+  // Get command suggestions for a project
+  getSuggestions: async (projectId: string): Promise<{
+    success: boolean;
+    commands: Array<{ command: string; description: string }>;
+  }> => {
+    const response = await api.get(`/api/terminal/suggestions/${projectId}`);
+    return response.data;
+  },
+
+  // Validate if a command is safe
+  validate: async (command: string): Promise<{
+    safe: boolean;
+    reason: string;
+  }> => {
+    const response = await api.get('/api/terminal/validate', {
+      params: { command },
+    });
+    return response.data;
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);
