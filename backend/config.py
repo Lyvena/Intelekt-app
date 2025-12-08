@@ -26,17 +26,15 @@ class Settings(BaseSettings):
     port: int = int(os.getenv("PORT", 8000))
     
     # CORS - Allow multiple hosting platforms
+    # Note: Wildcards like *.pages.dev don't work - add exact URLs
     cors_origins: list = [
+        origin.strip() 
+        for origin in os.getenv("CORS_ORIGINS", "").split(",") 
+        if origin.strip()
+    ] if os.getenv("CORS_ORIGINS") else [
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://*.onrender.com",
-        "https://*.divio-media.net",
-        "https://*.divio-media.com",
-        "https://*.divio.app",
-        "https://*.railway.app",
-        "https://*.vercel.app",
-        "https://*.netlify.app",
-        "https://*.pages.dev",
+        "http://localhost:8080",
         "https://app.theintelekt.xyz",
         "https://app1.theintelekt.xyz",
         "https://theintelekt.xyz",
