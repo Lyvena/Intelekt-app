@@ -429,6 +429,136 @@ export const exportAPI = {
   },
 };
 
+export const gitAPI = {
+  // Initialize git repository
+  init: async (projectId: string): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/api/git/${projectId}/init`);
+    return response.data;
+  },
+
+  // Get git status
+  getStatus: async (projectId: string): Promise<{
+    success: boolean;
+    is_repo: boolean;
+    branch?: string;
+    staged: Array<{ path: string; status: string }>;
+    unstaged: Array<{ path: string; status: string }>;
+    untracked: string[];
+    has_changes: boolean;
+  }> => {
+    const response = await api.get(`/api/git/${projectId}/status`);
+    return response.data;
+  },
+
+  // Stage files
+  addFiles: async (
+    projectId: string,
+    files?: string[]
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/api/git/${projectId}/add`, { files });
+    return response.data;
+  },
+
+  // Create commit
+  commit: async (
+    projectId: string,
+    message: string,
+    addAll: boolean = true
+  ): Promise<{
+    success: boolean;
+    message: string;
+    commit_hash?: string;
+  }> => {
+    const response = await api.post(`/api/git/${projectId}/commit`, {
+      message,
+      add_all: addAll,
+    });
+    return response.data;
+  },
+
+  // Get commit log
+  getLog: async (projectId: string, limit: number = 50): Promise<{
+    success: boolean;
+    commits: Array<{
+      hash: string;
+      short_hash: string;
+      message: string;
+      author: string;
+      date: string;
+    }>;
+    count: number;
+  }> => {
+    const response = await api.get(`/api/git/${projectId}/log`, {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  // Get branches
+  getBranches: async (projectId: string): Promise<{
+    success: boolean;
+    current_branch: string | null;
+    branches: Array<{ name: string; is_current: boolean }>;
+    count: number;
+  }> => {
+    const response = await api.get(`/api/git/${projectId}/branches`);
+    return response.data;
+  },
+
+  // Create branch
+  createBranch: async (
+    projectId: string,
+    branchName: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/api/git/${projectId}/branches`, {
+      branch_name: branchName,
+    });
+    return response.data;
+  },
+
+  // Checkout branch
+  checkoutBranch: async (
+    projectId: string,
+    branchName: string
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/api/git/${projectId}/checkout`, {
+      branch_name: branchName,
+    });
+    return response.data;
+  },
+
+  // Get diff
+  getDiff: async (
+    projectId: string,
+    staged: boolean = false,
+    commit?: string
+  ): Promise<{
+    success: boolean;
+    diffs: Array<{
+      path: string;
+      status: string;
+      additions: number;
+      deletions: number;
+      diff_content: string;
+    }>;
+    count: number;
+  }> => {
+    const response = await api.get(`/api/git/${projectId}/diff`, {
+      params: { staged, commit },
+    });
+    return response.data;
+  },
+
+  // Discard changes
+  discardChanges: async (
+    projectId: string,
+    files?: string[]
+  ): Promise<{ success: boolean; message: string }> => {
+    const response = await api.post(`/api/git/${projectId}/discard`, { files });
+    return response.data;
+  },
+};
+
 export const projectsAPI = {
   create: async (data: ProjectCreate): Promise<Project> => {
     const response = await api.post<Project>('/api/projects', data);

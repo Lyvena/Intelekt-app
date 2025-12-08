@@ -14,6 +14,7 @@ from routes.context import router as context_router
 from routes.dependencies import router as deps_router
 from routes.terminal import router as terminal_router
 from routes.export import router as export_router
+from routes.git import router as git_router
 from config import settings
 from models.database import Base, engine
 import os
@@ -52,6 +53,7 @@ app.include_router(context_router)
 app.include_router(deps_router)
 app.include_router(terminal_router)
 app.include_router(export_router)
+app.include_router(git_router)
 
 
 @app.get("/")
