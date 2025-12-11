@@ -1,62 +1,111 @@
 from datetime import datetime, timedelta
 from typing import Optional
-from jose import JWTError, jwt
-from passlib.context import CryptContext
+import jwt
+from jwt import PyJWKClient
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from models.database import get_db, User
 from config import settings
+import os
 
-# Security configuration from settings
-SECRET_KEY = settings.secret_key
-ALGORITHM = settings.algorithm
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
+# Clerk configuration
+CLERK_PUBLISHABLE_KEY = os.getenv("CLERK_PUBLISHABLE_KEY", "")
+CLERK_SECRET_KEY = os.getenv("CLERK_SECRET_KEY", "")
+CLERK_JWT_ISSUER = os.getenv("CLERK_JWT_ISSUER", "")  # e.g., https://your-app.clerk.accounts.dev
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
+# Security scheme
+security = HTTPBearer()
 
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash."""
-    return pwd_context.verify(plain_password, hashed_password)
+# Cache for JWKS client
+_jwks_client: Optional[PyJWKClient] = None
 
-def get_password_hash(password: str) -> str:
-    """Hash a password."""
-    return pwd_context.hash(password)
+def get_jwks_client() -> Optional[PyJWKClient]:
+    """Get or create JWKS client for Clerk."""
+    global _jwks_client
+    if _jwks_client is None and CLERK_JWT_ISSUER:
+        jwks_url = f"{CLERK_JWT_ISSUER}/.well-known/jwks.json"
+        _jwks_client = PyJWKClient(jwks_url)
+    return _jwks_client
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create a JWT access token."""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
 
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
-) -> User:
-    """Get the current authenticated user."""
+async def verify_clerk_token(token: str) -> dict:
+    """Verify a Clerk JWT token and return the payload."""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        if user_id is None:
-            raise credentials_exception
-    except JWTError:
-        raise credentials_exception
     
-    user = db.query(User).filter(User.id == user_id).first()
-    if user is None:
+    jwks_client = get_jwks_client()
+    if not jwks_client:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Authentication not configured properly"
+        )
+    
+    try:
+        # Get the signing key from Clerk's JWKS
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        
+        # Decode and verify the token
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            issuer=CLERK_JWT_ISSUER,
+            options={"verify_aud": False}  # Clerk doesn't always include audience
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.InvalidTokenError as e:
+        print(f"Token validation error: {e}")
         raise credentials_exception
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db)
+) -> User:
+    """Get the current authenticated user from Clerk token."""
+    token = credentials.credentials
+    
+    # Verify Clerk token
+    payload = await verify_clerk_token(token)
+    
+    # Get Clerk user ID from token
+    clerk_user_id = payload.get("sub")
+    if not clerk_user_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token payload"
+        )
+    
+    # Find or create user in our database
+    user = db.query(User).filter(User.id == clerk_user_id).first()
+    
+    if not user:
+        # Create user from Clerk data
+        user = User(
+            id=clerk_user_id,
+            email=payload.get("email", ""),
+            username=payload.get("username", payload.get("email", clerk_user_id)),
+            full_name=payload.get("name", ""),
+            hashed_password="",  # No password needed with Clerk
+            is_active=True,
+            is_superuser=False
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    
     return user
+
 
 async def get_current_active_user(
     current_user: User = Depends(get_current_user)
@@ -65,3 +114,24 @@ async def get_current_active_user(
     if not current_user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+
+# Legacy functions for backwards compatibility (can be removed later)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """Verify a password against a hash (legacy)."""
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password: str) -> str:
+    """Hash a password (legacy)."""
+    from passlib.context import CryptContext
+    pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+    return pwd_context.hash(password)
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create a JWT access token (legacy - not used with Clerk)."""
+    pass
+
+# Keep for reference
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes

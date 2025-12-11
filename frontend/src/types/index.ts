@@ -80,9 +80,8 @@ export interface AuthResponse {
 export interface AuthContextType {
   user: User | null;
   token: string | null;
-  login: (username: string, password: string) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => void;
+  getToken: () => Promise<string | null>;
+  logout: () => void | Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }

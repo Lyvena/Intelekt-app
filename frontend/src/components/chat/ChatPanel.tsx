@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Folder, Sparkles } from 'lucide-react';
 import { useStore, useCurrentProjectMessages } from '../../store/useStore';
+import { useAuth } from '../../contexts/AuthContext';
 import type { ChatMessage } from '../../types';
 import { cn, formatDate } from '../../lib/utils';
 import { MessageContent } from './MessageContent';
@@ -23,6 +24,7 @@ export const ChatPanel: React.FC = () => {
     setShowPreview,
   } = useStore();
 
+  const { getToken } = useAuth();
   const messages = useCurrentProjectMessages();
   const [inputMessage, setInputMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -53,7 +55,7 @@ export const ChatPanel: React.FC = () => {
 
     try {
       // Use streaming endpoint
-      const token = localStorage.getItem('token');
+      const token = await getToken();
       const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
         method: 'POST',
         headers: {

@@ -1,67 +1,42 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { authAPI } from '../services/api';
-import type { User, AuthContextType, RegisterRequest } from '../types';
+import { createContext, useContext, useEffect, ReactNode } from 'react';
+import { useUser, useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
+import type { User, AuthContextType } from '../types';
+import { setTokenGetter } from '../services/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
+  const { getToken } = useClerkAuth();
+  const { signOut } = useClerk();
 
-  // Load user from localStorage on mount
+  // Register token getter with API service
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    const storedUser = localStorage.getItem('user');
+    setTokenGetter(getToken);
+  }, [getToken]);
 
-    if (storedToken && storedUser) {
-      setToken(storedToken);
-      setUser(JSON.parse(storedUser));
-    }
-    setIsLoading(false);
-  }, []);
+  // Map Clerk user to our User type
+  const user: User | null = clerkUser ? {
+    id: clerkUser.id,
+    email: clerkUser.primaryEmailAddress?.emailAddress || '',
+    username: clerkUser.username || clerkUser.primaryEmailAddress?.emailAddress || '',
+    full_name: clerkUser.fullName || undefined,
+    is_active: true,
+    is_superuser: false,
+    created_at: clerkUser.createdAt?.toISOString() || new Date().toISOString(),
+  } : null;
 
-  const login = async (username: string, password: string) => {
-    try {
-      const response = await authAPI.login({ username, password });
-      setToken(response.access_token);
-      setUser(response.user);
-      localStorage.setItem('token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-    } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
-    }
-  };
-
-  const register = async (data: RegisterRequest) => {
-    try {
-      const response = await authAPI.register(data);
-      setToken(response.access_token);
-      setUser(response.user);
-      localStorage.setItem('token', response.access_token);
-      localStorage.setItem('user', JSON.stringify(response.user));
-    } catch (error) {
-      console.error('Registration failed:', error);
-      throw error;
-    }
-  };
-
-  const logout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
+  const logout = async () => {
+    await signOut();
   };
 
   const value: AuthContextType = {
     user,
-    token,
-    login,
-    register,
+    token: null, // Token is handled by Clerk internally
+    getToken, // Expose getToken for API calls
     logout,
-    isAuthenticated: !!token && !!user,
-    isLoading,
+    isAuthenticated: isSignedIn || false,
+    isLoading: !isLoaded,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
