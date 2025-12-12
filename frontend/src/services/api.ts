@@ -46,7 +46,9 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clerk handles session expiry automatically
+      // Token expired or invalid - clear local storage
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
       console.error('Authentication error:', error.response?.data);
     }
     return Promise.reject(error);
@@ -428,7 +430,7 @@ export const exportAPI = {
     }, {
       responseType: 'blob',
     });
-    
+
     // Create blob URL for download
     const blob = new Blob([response.data], { type: 'application/zip' });
     return URL.createObjectURL(blob);
@@ -439,7 +441,7 @@ export const exportAPI = {
     const response = await api.get(`/api/export/download/${projectId}`, {
       responseType: 'blob',
     });
-    
+
     const blob = new Blob([response.data], { type: 'application/zip' });
     return URL.createObjectURL(blob);
   },
@@ -670,6 +672,26 @@ export const authAPI = {
 
   register: async (data: RegisterRequest): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/api/auth/register', data);
+    return response.data;
+  },
+
+  forgotPassword: async (email: string): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/api/auth/forgot-password', { email });
+    return response.data;
+  },
+
+  resetPassword: async (token: string, password: string): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/api/auth/reset-password', { token, password });
+    return response.data;
+  },
+
+  verifyEmail: async (token: string): Promise<{ message: string }> => {
+    const response = await api.post<{ message: string }>('/api/auth/verify-email', { token });
+    return response.data;
+  },
+
+  getMe: async (): Promise<AuthResponse['user']> => {
+    const response = await api.get<AuthResponse['user']>('/api/auth/me');
     return response.data;
   },
 

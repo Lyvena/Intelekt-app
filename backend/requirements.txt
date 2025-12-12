@@ -10,11 +10,12 @@ httpx>=0.28.1
 chromadb>=0.4.18
 python-multipart==0.0.6
 aiofiles==23.2.1
-# Authentication dependencies (Clerk)
-clerk-backend-api>=4.1.0
+# Authentication dependencies (Python-native)
 PyJWT[crypto]>=2.9.0
 passlib[bcrypt]==1.7.4
 python-dateutil==2.8.2
+fastapi-mail>=1.4.0
+itsdangerous>=2.2.0
 # Database
 sqlalchemy==2.0.23
 alembic==1.13.0

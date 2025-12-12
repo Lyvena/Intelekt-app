@@ -1,42 +1,76 @@
-import { createContext, useContext, useEffect, ReactNode } from 'react';
-import { useUser, useAuth as useClerkAuth, useClerk } from '@clerk/clerk-react';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import type { User, AuthContextType } from '../types';
 import { setTokenGetter } from '../services/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { user: clerkUser, isLoaded, isSignedIn } = useUser();
-  const { getToken } = useClerkAuth();
-  const { signOut } = useClerk();
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Initialize from localStorage
+  useEffect(() => {
+    const storedToken = localStorage.getItem('token');
+    const storedUser = localStorage.getItem('user');
+
+    if (storedToken && storedUser) {
+      try {
+        setToken(storedToken);
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        // Invalid stored data, clear it
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Token getter for API calls
+  const getToken = useCallback(async (): Promise<string | null> => {
+    return localStorage.getItem('token');
+  }, []);
 
   // Register token getter with API service
   useEffect(() => {
     setTokenGetter(getToken);
   }, [getToken]);
 
-  // Map Clerk user to our User type
-  const user: User | null = clerkUser ? {
-    id: clerkUser.id,
-    email: clerkUser.primaryEmailAddress?.emailAddress || '',
-    username: clerkUser.username || clerkUser.primaryEmailAddress?.emailAddress || '',
-    full_name: clerkUser.fullName || undefined,
-    is_active: true,
-    is_superuser: false,
-    created_at: clerkUser.createdAt?.toISOString() || new Date().toISOString(),
-  } : null;
+  const login = useCallback((newToken: string, newUser: User) => {
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('user', JSON.stringify(newUser));
+    setToken(newToken);
+    setUser(newUser);
+  }, []);
 
-  const logout = async () => {
-    await signOut();
-  };
+  const logout = useCallback(() => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const refreshUser = useCallback(() => {
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (e) {
+        // Invalid stored data
+      }
+    }
+  }, []);
 
   const value: AuthContextType = {
     user,
-    token: null, // Token is handled by Clerk internally
-    getToken, // Expose getToken for API calls
+    token,
+    getToken,
+    login,
     logout,
-    isAuthenticated: isSignedIn || false,
-    isLoading: !isLoaded,
+    refreshUser,
+    isAuthenticated: !!token && !!user,
+    isLoading,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

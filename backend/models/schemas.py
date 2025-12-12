@@ -103,6 +103,7 @@ class User(UserBase):
     id: str
     is_active: bool
     is_superuser: bool
+    email_verified: bool = False
     created_at: datetime
     
     class Config:

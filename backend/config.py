@@ -43,6 +43,19 @@ class Settings(BaseSettings):
     # Database URL (PostgreSQL for production)
     database_url: Optional[str] = None
     
+    # Email settings
+    mail_username: Optional[str] = None
+    mail_password: Optional[str] = None
+    mail_from: Optional[str] = None
+    mail_from_name: str = "Intelekt"
+    mail_server: str = "smtp.gmail.com"
+    mail_port: int = 587
+    mail_use_tls: bool = True
+    mail_use_ssl: bool = False
+    
+    # Frontend URL for email links
+    frontend_url: str = "http://localhost:5173"
+    
     class Config:
         env_file = ".env"
         case_sensitive = False

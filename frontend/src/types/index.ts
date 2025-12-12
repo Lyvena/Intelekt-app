@@ -56,6 +56,7 @@ export interface User {
   full_name?: string;
   is_active: boolean;
   is_superuser: boolean;
+  email_verified: boolean;
   created_at: string;
 }
 
@@ -81,7 +82,9 @@ export interface AuthContextType {
   user: User | null;
   token: string | null;
   getToken: () => Promise<string | null>;
+  login: (token: string, user: User) => void;
   logout: () => void | Promise<void>;
+  refreshUser: () => void;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
