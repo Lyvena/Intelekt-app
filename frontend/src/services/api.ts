@@ -664,6 +664,84 @@ export const projectsAPI = {
   },
 };
 
+export const integrationAPI = {
+  // Framework to Tasks
+  createTasksFromFramework: async (projectId: string, userId: string, userName: string) => {
+    const response = await api.post(
+      `/api/integration/${projectId}/framework-to-tasks?user_id=${userId}&user_name=${userName}`
+    );
+    return response.data;
+  },
+
+  // GitHub Linking
+  linkProjectToGithub: async (projectId: string, owner: string, repo: string) => {
+    const response = await api.post(`/api/integration/${projectId}/link-github`, { owner, repo });
+    return response.data;
+  },
+
+  getGithubLink: async (projectId: string) => {
+    const response = await api.get(`/api/integration/${projectId}/github-link`);
+    return response.data;
+  },
+
+  // GitHub Sync
+  syncGithubIssuesToTasks: async (projectId: string, userId: string, userName: string) => {
+    const response = await api.post(
+      `/api/integration/${projectId}/sync-github-issues?user_id=${userId}&user_name=${userName}`
+    );
+    return response.data;
+  },
+
+  createGithubIssueFromTask: async (projectId: string, taskId: string, userId: string) => {
+    const response = await api.post(
+      `/api/integration/${projectId}/tasks/${taskId}/create-github-issue?user_id=${userId}`
+    );
+    return response.data;
+  },
+
+  syncTaskStatusToGithub: async (projectId: string, taskId: string, userId: string) => {
+    const response = await api.post(
+      `/api/integration/${projectId}/tasks/${taskId}/sync-to-github?user_id=${userId}`
+    );
+    return response.data;
+  },
+
+  // Dashboard
+  getProjectDashboard: async (projectId: string, userId: string) => {
+    const response = await api.get(`/api/integration/${projectId}/dashboard?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Notifications
+  notifyTaskAssigned: async (projectId: string, taskId: string, assigneeId: string, assignerId: string, assignerName: string) => {
+    const response = await api.post(`/api/integration/${projectId}/notify/task-assigned`, {
+      task_id: taskId,
+      assignee_id: assigneeId,
+      assigner_id: assignerId,
+      assigner_name: assignerName
+    });
+    return response.data;
+  },
+
+  notifyTaskCompleted: async (projectId: string, taskId: string, completerId: string, completerName: string) => {
+    const response = await api.post(`/api/integration/${projectId}/notify/task-completed`, {
+      task_id: taskId,
+      completer_id: completerId,
+      completer_name: completerName
+    });
+    return response.data;
+  },
+
+  notifySprintStarted: async (projectId: string, sprintId: string, starterId: string, starterName: string) => {
+    const response = await api.post(`/api/integration/${projectId}/notify/sprint-started`, {
+      sprint_id: sprintId,
+      starter_id: starterId,
+      starter_name: starterName
+    });
+    return response.data;
+  },
+};
+
 export const githubAPI = {
   // Auth
   setToken: async (userId: string, token: string) => {
