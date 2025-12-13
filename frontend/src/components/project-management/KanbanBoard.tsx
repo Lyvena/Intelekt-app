@@ -24,8 +24,6 @@ interface Task {
 }
 
 interface KanbanBoardProps {
-  projectId: string;
-  sprintId?: string;
   tasks: Record<string, Task[]>;
   onTaskClick: (task: Task) => void;
   onTaskMove: (taskId: string, newStatus: string, newOrder: number) => void;

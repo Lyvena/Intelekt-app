@@ -1400,7 +1400,15 @@ export const frameworkAPI = {
 
   // Get specific step details
   getStepDetails: async (projectId: string, stepNumber: number): Promise<{
-    step: any;
+    step: {
+      step_number: number;
+      name: string;
+      description: string;
+      phase: string;
+      key_questions: string[];
+      deliverables: string[];
+      estimated_time: string;
+    };
   }> => {
     const response = await api.get(`/api/framework/step/${projectId}/${stepNumber}`);
     return response.data;
@@ -1410,15 +1418,32 @@ export const frameworkAPI = {
   completeStep: async (
     projectId: string,
     stepNumber: number,
-    userResponses: Record<string, any>,
+    userResponses: Record<string, unknown>,
     aiAnalysis: string
   ): Promise<{
     success: boolean;
     completed_step: number;
-    next_step?: any;
+    next_step?: {
+      step_number: number;
+      name: string;
+      description: string;
+      phase: string;
+    };
     framework_completed?: boolean;
-    summary?: any;
-    progress: any;
+    summary?: {
+      idea: string;
+      market_size: string;
+      target_customer: string;
+      value_proposition: string;
+      key_insights: string[];
+    };
+    progress: {
+      current_step: number;
+      progress_percentage: number;
+      completed_steps: number;
+      total_steps: number;
+      ready_for_development: boolean;
+    };
     message?: string;
   }> => {
     const response = await api.post(`/api/framework/step/${projectId}/complete`, {
@@ -1434,8 +1459,19 @@ export const frameworkAPI = {
   skipStep: async (projectId: string, stepNumber: number): Promise<{
     success: boolean;
     skipped_step: number;
-    next_step: any;
-    progress: any;
+    next_step: {
+      step_number: number;
+      name: string;
+      description: string;
+      phase: string;
+    };
+    progress: {
+      current_step: number;
+      progress_percentage: number;
+      completed_steps: number;
+      total_steps: number;
+      ready_for_development: boolean;
+    };
   }> => {
     const response = await api.post(`/api/framework/step/${projectId}/skip/${stepNumber}`);
     return response.data;
@@ -1467,7 +1503,16 @@ export const frameworkAPI = {
   },
 
   // Get framework summary
-  getSummary: async (projectId: string): Promise<any> => {
+  getSummary: async (projectId: string): Promise<{
+    idea: string;
+    market_size: string;
+    target_customer: string;
+    value_proposition: string;
+    key_insights: string[];
+    business_model: string;
+    product_plan: string;
+    mvp_specification: string;
+  }> => {
     const response = await api.get(`/api/framework/summary/${projectId}`);
     return response.data;
   },
@@ -1479,7 +1524,17 @@ export const frameworkAPI = {
   },
 
   // Get all 24 steps
-  getAllSteps: async (): Promise<{ steps: any[] }> => {
+  getAllSteps: async (): Promise<{
+    steps: Array<{
+      step_number: number;
+      name: string;
+      description: string;
+      phase: string;
+      key_questions: string[];
+      deliverables: string[];
+      estimated_time: string;
+    }>
+  }> => {
     const response = await api.get('/api/framework/steps');
     return response.data;
   },
@@ -1496,7 +1551,13 @@ export const frameworkAPI = {
     framework_step: number | null;
     framework_phase: string | null;
     step_name: string | null;
-    progress: any;
+    progress: {
+      current_step: number;
+      progress_percentage: number;
+      completed_steps: number;
+      total_steps: number;
+      ready_for_development: boolean;
+    };
     suggestions: string[];
   }> => {
     const response = await api.post(`/api/framework/chat/${projectId}`, {
