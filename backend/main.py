@@ -18,6 +18,7 @@ from routes.git import router as git_router
 from routes.framework import router as framework_router
 from routes.project_management import router as pm_router
 from routes.team import router as team_router
+from routes.github import router as github_router
 from config import settings, cors_origins
 from models.database import Base, engine
 import os
@@ -60,6 +61,7 @@ app.include_router(git_router)
 app.include_router(framework_router)
 app.include_router(pm_router)
 app.include_router(team_router)
+app.include_router(github_router)
 
 
 @app.get("/")
@@ -76,6 +78,7 @@ async def root():
             "framework": "/api/framework",
             "project_management": "/api/pm",
             "team": "/api/team",
+            "github": "/api/github",
             "docs": "/docs",
             "collaboration": "/ws/collab"
         }

@@ -664,6 +664,285 @@ export const projectsAPI = {
   },
 };
 
+export const githubAPI = {
+  // Auth
+  setToken: async (userId: string, token: string) => {
+    const response = await api.post(`/api/github/auth/token?user_id=${userId}`, { token });
+    return response.data;
+  },
+
+  validateToken: async (userId: string) => {
+    const response = await api.get(`/api/github/auth/validate?user_id=${userId}`);
+    return response.data;
+  },
+
+  getAuthenticatedUser: async (userId: string) => {
+    const response = await api.get(`/api/github/user?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Repositories
+  listRepos: async (userId: string, options?: { visibility?: string; sort?: string; per_page?: number }) => {
+    const response = await api.get(`/api/github/repos`, { params: { user_id: userId, ...options } });
+    return response.data;
+  },
+
+  getRepo: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}?user_id=${userId}`);
+    return response.data;
+  },
+
+  createRepo: async (userId: string, data: { name: string; description?: string; private?: boolean; auto_init?: boolean }) => {
+    const response = await api.post(`/api/github/repos?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  deleteRepo: async (userId: string, owner: string, repo: string) => {
+    const response = await api.delete(`/api/github/repos/${owner}/${repo}?user_id=${userId}`);
+    return response.data;
+  },
+
+  forkRepo: async (userId: string, owner: string, repo: string, options?: { organization?: string; name?: string }) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/fork?user_id=${userId}`, options || {});
+    return response.data;
+  },
+
+  searchRepos: async (userId: string, query: string, options?: { sort?: string; order?: string }) => {
+    const response = await api.get(`/api/github/repos/search`, { params: { user_id: userId, query, ...options } });
+    return response.data;
+  },
+
+  // Branches
+  listBranches: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/branches?user_id=${userId}`);
+    return response.data;
+  },
+
+  getBranch: async (userId: string, owner: string, repo: string, branch: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/branches/${branch}?user_id=${userId}`);
+    return response.data;
+  },
+
+  createBranch: async (userId: string, owner: string, repo: string, branchName: string, fromBranch?: string) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/branches?user_id=${userId}`, {
+      branch_name: branchName,
+      from_branch: fromBranch || 'main'
+    });
+    return response.data;
+  },
+
+  deleteBranch: async (userId: string, owner: string, repo: string, branch: string) => {
+    const response = await api.delete(`/api/github/repos/${owner}/${repo}/branches/${branch}?user_id=${userId}`);
+    return response.data;
+  },
+
+  mergeBranches: async (userId: string, owner: string, repo: string, base: string, head: string, message?: string) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/merge?user_id=${userId}`, {
+      base, head, commit_message: message
+    });
+    return response.data;
+  },
+
+  // Commits
+  listCommits: async (userId: string, owner: string, repo: string, branch?: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/commits`, {
+      params: { user_id: userId, branch }
+    });
+    return response.data;
+  },
+
+  getCommit: async (userId: string, owner: string, repo: string, ref: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/commits/${ref}?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Pull Requests
+  listPullRequests: async (userId: string, owner: string, repo: string, state?: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/pulls`, {
+      params: { user_id: userId, state: state || 'open' }
+    });
+    return response.data;
+  },
+
+  getPullRequest: async (userId: string, owner: string, repo: string, pullNumber: number) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/pulls/${pullNumber}?user_id=${userId}`);
+    return response.data;
+  },
+
+  createPullRequest: async (userId: string, owner: string, repo: string, data: {
+    title: string; head: string; base: string; body?: string; draft?: boolean
+  }) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/pulls?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  updatePullRequest: async (userId: string, owner: string, repo: string, pullNumber: number, data: {
+    title?: string; body?: string; state?: string
+  }) => {
+    const response = await api.patch(`/api/github/repos/${owner}/${repo}/pulls/${pullNumber}?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  mergePullRequest: async (userId: string, owner: string, repo: string, pullNumber: number, options?: {
+    commit_title?: string; commit_message?: string; merge_method?: string
+  }) => {
+    const response = await api.put(`/api/github/repos/${owner}/${repo}/pulls/${pullNumber}/merge?user_id=${userId}`, options || {});
+    return response.data;
+  },
+
+  listPRFiles: async (userId: string, owner: string, repo: string, pullNumber: number) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/pulls/${pullNumber}/files?user_id=${userId}`);
+    return response.data;
+  },
+
+  createPRReview: async (userId: string, owner: string, repo: string, pullNumber: number, body: string, event: string) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/pulls/${pullNumber}/reviews?user_id=${userId}`, {
+      body, event
+    });
+    return response.data;
+  },
+
+  // Issues
+  listIssues: async (userId: string, owner: string, repo: string, options?: { state?: string; labels?: string }) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/issues`, {
+      params: { user_id: userId, ...options }
+    });
+    return response.data;
+  },
+
+  getIssue: async (userId: string, owner: string, repo: string, issueNumber: number) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/issues/${issueNumber}?user_id=${userId}`);
+    return response.data;
+  },
+
+  createIssue: async (userId: string, owner: string, repo: string, data: {
+    title: string; body?: string; labels?: string[]; assignees?: string[]
+  }) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/issues?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  updateIssue: async (userId: string, owner: string, repo: string, issueNumber: number, data: {
+    title?: string; body?: string; state?: string; labels?: string[]
+  }) => {
+    const response = await api.patch(`/api/github/repos/${owner}/${repo}/issues/${issueNumber}?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  addIssueComment: async (userId: string, owner: string, repo: string, issueNumber: number, body: string) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/issues/${issueNumber}/comments?user_id=${userId}`, { body });
+    return response.data;
+  },
+
+  // GitHub Actions
+  listWorkflows: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/actions/workflows?user_id=${userId}`);
+    return response.data;
+  },
+
+  triggerWorkflow: async (userId: string, owner: string, repo: string, workflowId: string, ref: string, inputs?: Record<string, string>) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches?user_id=${userId}`, {
+      ref, inputs
+    });
+    return response.data;
+  },
+
+  listWorkflowRuns: async (userId: string, owner: string, repo: string, options?: { workflow_id?: string; status?: string }) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/actions/runs`, {
+      params: { user_id: userId, ...options }
+    });
+    return response.data;
+  },
+
+  getWorkflowRun: async (userId: string, owner: string, repo: string, runId: number) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/actions/runs/${runId}?user_id=${userId}`);
+    return response.data;
+  },
+
+  cancelWorkflowRun: async (userId: string, owner: string, repo: string, runId: number) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/actions/runs/${runId}/cancel?user_id=${userId}`);
+    return response.data;
+  },
+
+  rerunWorkflow: async (userId: string, owner: string, repo: string, runId: number) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/actions/runs/${runId}/rerun?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Releases
+  listReleases: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/releases?user_id=${userId}`);
+    return response.data;
+  },
+
+  getLatestRelease: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/releases/latest?user_id=${userId}`);
+    return response.data;
+  },
+
+  createRelease: async (userId: string, owner: string, repo: string, data: {
+    tag_name: string; name: string; body?: string; draft?: boolean; prerelease?: boolean
+  }) => {
+    const response = await api.post(`/api/github/repos/${owner}/${repo}/releases?user_id=${userId}`, data);
+    return response.data;
+  },
+
+  // Collaborators
+  listCollaborators: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/collaborators?user_id=${userId}`);
+    return response.data;
+  },
+
+  addCollaborator: async (userId: string, owner: string, repo: string, username: string, permission?: string) => {
+    const response = await api.put(`/api/github/repos/${owner}/${repo}/collaborators/${username}?user_id=${userId}`, {
+      permission: permission || 'push'
+    });
+    return response.data;
+  },
+
+  removeCollaborator: async (userId: string, owner: string, repo: string, username: string) => {
+    const response = await api.delete(`/api/github/repos/${owner}/${repo}/collaborators/${username}?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Stats
+  getLanguages: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/languages?user_id=${userId}`);
+    return response.data;
+  },
+
+  getContributorsStats: async (userId: string, owner: string, repo: string) => {
+    const response = await api.get(`/api/github/repos/${owner}/${repo}/stats/contributors?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Notifications
+  listNotifications: async (userId: string, all?: boolean) => {
+    const response = await api.get(`/api/github/notifications`, {
+      params: { user_id: userId, all_notifications: all }
+    });
+    return response.data;
+  },
+
+  markNotificationsRead: async (userId: string) => {
+    const response = await api.put(`/api/github/notifications/read?user_id=${userId}`);
+    return response.data;
+  },
+
+  // Gists
+  listGists: async (userId: string) => {
+    const response = await api.get(`/api/github/gists?user_id=${userId}`);
+    return response.data;
+  },
+
+  createGist: async (userId: string, files: Record<string, { content: string }>, description?: string, isPublic?: boolean) => {
+    const response = await api.post(`/api/github/gists?user_id=${userId}`, {
+      files, description, public: isPublic
+    });
+    return response.data;
+  },
+};
+
 export const projectManagementAPI = {
   // Tasks
   createTask: async (projectId: string, taskData: {
