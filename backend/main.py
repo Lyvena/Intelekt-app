@@ -16,6 +16,8 @@ from routes.terminal import router as terminal_router
 from routes.export import router as export_router
 from routes.git import router as git_router
 from routes.framework import router as framework_router
+from routes.project_management import router as pm_router
+from routes.team import router as team_router
 from config import settings, cors_origins
 from models.database import Base, engine
 import os
@@ -56,6 +58,8 @@ app.include_router(terminal_router)
 app.include_router(export_router)
 app.include_router(git_router)
 app.include_router(framework_router)
+app.include_router(pm_router)
+app.include_router(team_router)
 
 
 @app.get("/")
@@ -70,6 +74,8 @@ async def root():
             "chat": "/api/chat",
             "projects": "/api/projects",
             "framework": "/api/framework",
+            "project_management": "/api/pm",
+            "team": "/api/team",
             "docs": "/docs",
             "collaboration": "/ws/collab"
         }

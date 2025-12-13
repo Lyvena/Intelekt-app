@@ -664,6 +664,349 @@ export const projectsAPI = {
   },
 };
 
+export const projectManagementAPI = {
+  // Tasks
+  createTask: async (projectId: string, taskData: {
+    title: string;
+    description?: string;
+    type?: string;
+    priority?: string;
+    assignee_id?: string;
+    sprint_id?: string;
+    story_points?: number;
+    due_date?: string;
+  }, reporterId: string, reporterName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/tasks`, taskData, {
+      params: { reporter_id: reporterId, reporter_name: reporterName }
+    });
+    return response.data;
+  },
+
+  getTasks: async (projectId: string, filters?: {
+    status?: string;
+    assignee_id?: string;
+    sprint_id?: string;
+    priority?: string;
+  }) => {
+    const response = await api.get(`/api/pm/${projectId}/tasks`, { params: filters });
+    return response.data;
+  },
+
+  getTask: async (projectId: string, taskId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/tasks/${taskId}`);
+    return response.data;
+  },
+
+  updateTask: async (projectId: string, taskId: string, updates: Record<string, unknown>, userId: string, userName: string) => {
+    const response = await api.patch(`/api/pm/${projectId}/tasks/${taskId}`, updates, {
+      params: { user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  moveTask: async (projectId: string, taskId: string, newStatus: string, newOrder: number, userId: string, userName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/tasks/${taskId}/move`, null, {
+      params: { new_status: newStatus, new_order: newOrder, user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  deleteTask: async (projectId: string, taskId: string, userId: string, userName: string) => {
+    const response = await api.delete(`/api/pm/${projectId}/tasks/${taskId}`, {
+      params: { user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  // Kanban Board
+  getKanbanBoard: async (projectId: string, sprintId?: string) => {
+    const response = await api.get(`/api/pm/${projectId}/board`, { params: { sprint_id: sprintId } });
+    return response.data;
+  },
+
+  // Comments
+  addComment: async (projectId: string, taskId: string, content: string, userId: string, userName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/tasks/${taskId}/comments`, null, {
+      params: { content, user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  getComments: async (projectId: string, taskId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/tasks/${taskId}/comments`);
+    return response.data;
+  },
+
+  // Checklist
+  addChecklistItem: async (projectId: string, taskId: string, text: string) => {
+    const response = await api.post(`/api/pm/${projectId}/tasks/${taskId}/checklist`, null, {
+      params: { text }
+    });
+    return response.data;
+  },
+
+  toggleChecklistItem: async (projectId: string, taskId: string, itemId: string, userId: string) => {
+    const response = await api.post(`/api/pm/${projectId}/tasks/${taskId}/checklist/${itemId}/toggle`, null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  // Sprints
+  createSprint: async (projectId: string, sprintData: {
+    name: string;
+    goal?: string;
+    start_date: string;
+    end_date: string;
+    capacity_points?: number;
+  }, userId: string, userName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/sprints`, sprintData, {
+      params: { user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  getSprints: async (projectId: string, status?: string) => {
+    const response = await api.get(`/api/pm/${projectId}/sprints`, { params: { status } });
+    return response.data;
+  },
+
+  getActiveSprint: async (projectId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/sprints/active`);
+    return response.data;
+  },
+
+  startSprint: async (projectId: string, sprintId: string, userId: string, userName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/sprints/${sprintId}/start`, null, {
+      params: { user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  completeSprint: async (projectId: string, sprintId: string, userId: string, userName: string, moveIncompleteTo?: string) => {
+    const response = await api.post(`/api/pm/${projectId}/sprints/${sprintId}/complete`, null, {
+      params: { user_id: userId, user_name: userName, move_incomplete_to: moveIncompleteTo }
+    });
+    return response.data;
+  },
+
+  // Milestones
+  createMilestone: async (projectId: string, data: {
+    name: string;
+    description?: string;
+    target_date: string;
+    version?: string;
+  }, userId: string, userName: string) => {
+    const response = await api.post(`/api/pm/${projectId}/milestones`, data, {
+      params: { user_id: userId, user_name: userName }
+    });
+    return response.data;
+  },
+
+  getMilestones: async (projectId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/milestones`);
+    return response.data;
+  },
+
+  // Analytics
+  getAnalytics: async (projectId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/analytics`);
+    return response.data;
+  },
+
+  getBurndownData: async (projectId: string, sprintId: string) => {
+    const response = await api.get(`/api/pm/${projectId}/sprints/${sprintId}/burndown`);
+    return response.data;
+  },
+
+  // Activities
+  getActivities: async (projectId: string, limit?: number, entityType?: string) => {
+    const response = await api.get(`/api/pm/${projectId}/activities`, {
+      params: { limit, entity_type: entityType }
+    });
+    return response.data;
+  },
+};
+
+export const teamAPI = {
+  // Team Members
+  addMember: async (projectId: string, data: {
+    user_id: string;
+    username: string;
+    email: string;
+    role?: string;
+    full_name?: string;
+  }) => {
+    const response = await api.post(`/api/team/${projectId}/members`, null, { params: data });
+    return response.data;
+  },
+
+  getMembers: async (projectId: string) => {
+    const response = await api.get(`/api/team/${projectId}/members`);
+    return response.data;
+  },
+
+  getMember: async (projectId: string, userId: string) => {
+    const response = await api.get(`/api/team/${projectId}/members/${userId}`);
+    return response.data;
+  },
+
+  updateMemberRole: async (projectId: string, userId: string, newRole: string, updatedBy: string) => {
+    const response = await api.patch(`/api/team/${projectId}/members/${userId}/role`, null, {
+      params: { new_role: newRole, updated_by: updatedBy }
+    });
+    return response.data;
+  },
+
+  removeMember: async (projectId: string, userId: string, removedBy: string) => {
+    const response = await api.delete(`/api/team/${projectId}/members/${userId}`, {
+      params: { removed_by: removedBy }
+    });
+    return response.data;
+  },
+
+  // Invites
+  createInvite: async (projectId: string, email: string, role: string, invitedBy: string) => {
+    const response = await api.post(`/api/team/${projectId}/invites`, null, {
+      params: { email, role, invited_by: invitedBy }
+    });
+    return response.data;
+  },
+
+  getPendingInvites: async (projectId: string) => {
+    const response = await api.get(`/api/team/${projectId}/invites`);
+    return response.data;
+  },
+
+  acceptInvite: async (inviteId: string, userId: string, username: string, email: string, fullName?: string) => {
+    const response = await api.post(`/api/team/invites/${inviteId}/accept`, null, {
+      params: { user_id: userId, username, email, full_name: fullName }
+    });
+    return response.data;
+  },
+
+  // Channels
+  createChannel: async (projectId: string, name: string, createdBy: string, description?: string, isPrivate?: boolean) => {
+    const response = await api.post(`/api/team/${projectId}/channels`, null, {
+      params: { name, created_by: createdBy, description, is_private: isPrivate }
+    });
+    return response.data;
+  },
+
+  createDirectChannel: async (projectId: string, user1Id: string, user2Id: string) => {
+    const response = await api.post(`/api/team/${projectId}/channels/dm`, null, {
+      params: { user1_id: user1Id, user2_id: user2Id }
+    });
+    return response.data;
+  },
+
+  getChannels: async (projectId: string, userId: string) => {
+    const response = await api.get(`/api/team/${projectId}/channels`, { params: { user_id: userId } });
+    return response.data;
+  },
+
+  // Messages
+  sendMessage: async (projectId: string, channelId: string, content: string, userId: string, userName: string, options?: {
+    messageType?: string;
+    threadId?: string;
+  }) => {
+    const response = await api.post(`/api/team/${projectId}/channels/${channelId}/messages`, null, {
+      params: { content, user_id: userId, user_name: userName, ...options }
+    });
+    return response.data;
+  },
+
+  getMessages: async (projectId: string, channelId: string, limit?: number, threadId?: string) => {
+    const response = await api.get(`/api/team/${projectId}/channels/${channelId}/messages`, {
+      params: { limit, thread_id: threadId }
+    });
+    return response.data;
+  },
+
+  editMessage: async (projectId: string, channelId: string, messageId: string, content: string, userId: string) => {
+    const response = await api.patch(`/api/team/${projectId}/channels/${channelId}/messages/${messageId}`, null, {
+      params: { content, user_id: userId }
+    });
+    return response.data;
+  },
+
+  deleteMessage: async (projectId: string, channelId: string, messageId: string, userId: string) => {
+    const response = await api.delete(`/api/team/${projectId}/channels/${channelId}/messages/${messageId}`, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  addReaction: async (projectId: string, channelId: string, messageId: string, emoji: string, userId: string) => {
+    const response = await api.post(`/api/team/${projectId}/channels/${channelId}/messages/${messageId}/reactions`, null, {
+      params: { emoji, user_id: userId }
+    });
+    return response.data;
+  },
+
+  // Typing
+  setTyping: async (projectId: string, channelId: string, userId: string) => {
+    const response = await api.post(`/api/team/${projectId}/channels/${channelId}/typing`, null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  getTypingUsers: async (projectId: string, channelId: string) => {
+    const response = await api.get(`/api/team/${projectId}/channels/${channelId}/typing`);
+    return response.data;
+  },
+
+  // Notifications
+  getNotifications: async (userId: string, limit?: number, unreadOnly?: boolean) => {
+    const response = await api.get('/api/team/notifications', {
+      params: { user_id: userId, limit, unread_only: unreadOnly }
+    });
+    return response.data;
+  },
+
+  getUnreadCount: async (userId: string) => {
+    const response = await api.get('/api/team/notifications/unread-count', {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  markNotificationRead: async (notificationId: string, userId: string) => {
+    const response = await api.post(`/api/team/notifications/${notificationId}/read`, null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  markAllNotificationsRead: async (userId: string) => {
+    const response = await api.post('/api/team/notifications/read-all', null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  // Presence
+  setOnline: async (projectId: string, userId: string) => {
+    const response = await api.post(`/api/team/${projectId}/presence/online`, null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  setOffline: async (projectId: string, userId: string) => {
+    const response = await api.post(`/api/team/${projectId}/presence/offline`, null, {
+      params: { user_id: userId }
+    });
+    return response.data;
+  },
+
+  getOnlineUsers: async (projectId: string) => {
+    const response = await api.get(`/api/team/${projectId}/presence`);
+    return response.data;
+  },
+};
+
 export const frameworkAPI = {
   // Initialize the MIT 24-Step framework for a project
   initialize: async (projectId: string, idea: string): Promise<{
