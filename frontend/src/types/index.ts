@@ -88,3 +88,55 @@ export interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
 }
+
+// MIT 24-Step Framework Types
+export type FrameworkPhase = 'customer' | 'value' | 'acquisition' | 'monetization' | 'building' | 'scaling';
+export type StepStatus = 'not_started' | 'in_progress' | 'completed' | 'skipped';
+export type ProjectPhase = 'ideation' | 'development';
+
+export interface FrameworkStep {
+  number: number;
+  name: string;
+  phase: FrameworkPhase;
+  description: string;
+  key_questions: string[];
+  deliverables: string[];
+  status: StepStatus;
+  user_responses: Record<string, string>;
+  ai_analysis: string | null;
+  completed_at: string | null;
+}
+
+export interface FrameworkProgress {
+  current_step: number;
+  current_phase: string;
+  completed_steps: number;
+  total_steps: number;
+  progress_percentage: number;
+  ready_for_development: boolean;
+  phases_completed: Record<string, boolean>;
+}
+
+export interface FrameworkSession {
+  project_id: string;
+  idea_description: string;
+  current_step: number;
+  current_phase: FrameworkPhase;
+  steps: Record<string, FrameworkStep>;
+  framework_summary: FrameworkSummary | null;
+  ready_for_development: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FrameworkSummary {
+  idea: string;
+  beachhead_market: string;
+  persona: string;
+  value_proposition: string;
+  business_model: string;
+  mvp_specification: string;
+  product_plan: string;
+  key_insights: string[];
+  ready_for_development: boolean;
+}

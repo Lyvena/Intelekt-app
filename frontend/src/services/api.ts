@@ -664,6 +664,156 @@ export const projectsAPI = {
   },
 };
 
+export const frameworkAPI = {
+  // Initialize the MIT 24-Step framework for a project
+  initialize: async (projectId: string, idea: string): Promise<{
+    success: boolean;
+    project_id: string;
+    current_step: number;
+    current_phase: string;
+    step_details: any;
+    message: string;
+  }> => {
+    const response = await api.post(`/api/framework/initialize/${projectId}`, {
+      description: idea,
+    });
+    return response.data;
+  },
+
+  // Get framework session
+  getSession: async (projectId: string): Promise<{
+    session: any;
+    progress: any;
+  }> => {
+    const response = await api.get(`/api/framework/session/${projectId}`);
+    return response.data;
+  },
+
+  // Get current step
+  getCurrentStep: async (projectId: string): Promise<{
+    step: any;
+    progress: any;
+  }> => {
+    const response = await api.get(`/api/framework/step/${projectId}`);
+    return response.data;
+  },
+
+  // Get specific step details
+  getStepDetails: async (projectId: string, stepNumber: number): Promise<{
+    step: any;
+  }> => {
+    const response = await api.get(`/api/framework/step/${projectId}/${stepNumber}`);
+    return response.data;
+  },
+
+  // Complete a step
+  completeStep: async (
+    projectId: string,
+    stepNumber: number,
+    userResponses: Record<string, any>,
+    aiAnalysis: string
+  ): Promise<{
+    success: boolean;
+    completed_step: number;
+    next_step?: any;
+    framework_completed?: boolean;
+    summary?: any;
+    progress: any;
+    message?: string;
+  }> => {
+    const response = await api.post(`/api/framework/step/${projectId}/complete`, {
+      project_id: projectId,
+      step_number: stepNumber,
+      user_responses: userResponses,
+      ai_analysis: aiAnalysis,
+    });
+    return response.data;
+  },
+
+  // Skip a step
+  skipStep: async (projectId: string, stepNumber: number): Promise<{
+    success: boolean;
+    skipped_step: number;
+    next_step: any;
+    progress: any;
+  }> => {
+    const response = await api.post(`/api/framework/step/${projectId}/skip/${stepNumber}`);
+    return response.data;
+  },
+
+  // Get progress
+  getProgress: async (projectId: string): Promise<{
+    current_step: number;
+    current_phase: string;
+    completed_steps: number;
+    total_steps: number;
+    progress_percentage: number;
+    ready_for_development: boolean;
+    phases_completed: Record<string, boolean>;
+  }> => {
+    const response = await api.get(`/api/framework/progress/${projectId}`);
+    return response.data;
+  },
+
+  // Check if ready for development
+  canDevelop: async (projectId: string): Promise<{
+    can_start: boolean;
+    reason: string;
+    missing_steps?: string[];
+    recommendation?: string;
+  }> => {
+    const response = await api.get(`/api/framework/can-develop/${projectId}`);
+    return response.data;
+  },
+
+  // Get framework summary
+  getSummary: async (projectId: string): Promise<any> => {
+    const response = await api.get(`/api/framework/summary/${projectId}`);
+    return response.data;
+  },
+
+  // Export framework document
+  exportDocument: async (projectId: string): Promise<{ document: string }> => {
+    const response = await api.get(`/api/framework/export/${projectId}`);
+    return response.data;
+  },
+
+  // Get all 24 steps
+  getAllSteps: async (): Promise<{ steps: any[] }> => {
+    const response = await api.get('/api/framework/steps');
+    return response.data;
+  },
+
+  // Chat during framework analysis (non-streaming)
+  chat: async (
+    projectId: string,
+    message: string,
+    aiProvider: 'claude' | 'grok' = 'claude',
+    conversationHistory: Array<{ role: string; content: string }> = [],
+    idea?: string
+  ): Promise<{
+    message: string;
+    framework_step: number | null;
+    framework_phase: string | null;
+    step_name: string | null;
+    progress: any;
+    suggestions: string[];
+  }> => {
+    const response = await api.post(`/api/framework/chat/${projectId}`, {
+      message,
+      ai_provider: aiProvider,
+      conversation_history: conversationHistory,
+      idea,
+    });
+    return response.data;
+  },
+
+  // Get streaming chat URL for framework
+  getStreamUrl: (projectId: string): string => {
+    return `${api.defaults.baseURL}/api/framework/chat/${projectId}/stream`;
+  },
+};
+
 export const authAPI = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/api/auth/login', data);

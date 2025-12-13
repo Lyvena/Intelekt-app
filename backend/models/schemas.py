@@ -17,6 +17,22 @@ class TechStack(str, Enum):
     JAVASCRIPT = "javascript"
 
 
+class ProjectPhase(str, Enum):
+    """Project development phases."""
+    IDEATION = "ideation"           # MIT 24-Step framework analysis
+    DEVELOPMENT = "development"     # Code generation phase
+
+
+class FrameworkPhase(str, Enum):
+    """MIT 24-Step Framework phases."""
+    CUSTOMER = "customer"           # Steps 1-5
+    VALUE = "value"                 # Steps 6-9
+    ACQUISITION = "acquisition"     # Steps 10-14
+    MONETIZATION = "monetization"   # Steps 15-17
+    BUILDING = "building"           # Steps 18-20
+    SCALING = "scaling"             # Steps 21-24
+
+
 class ChatMessage(BaseModel):
     """Chat message model."""
     role: Literal["user", "assistant", "system"]
@@ -31,6 +47,9 @@ class ChatRequest(BaseModel):
     ai_provider: AIProvider = AIProvider.CLAUDE
     tech_stack: Optional[TechStack] = None
     conversation_history: List[ChatMessage] = Field(default_factory=list)
+    # Framework-related fields
+    project_phase: Optional[ProjectPhase] = ProjectPhase.IDEATION
+    framework_step: Optional[int] = None  # Current step in MIT 24-Step framework
 
 
 class ChatResponse(BaseModel):
@@ -40,6 +59,11 @@ class ChatResponse(BaseModel):
     file_path: Optional[str] = None
     project_id: Optional[str] = None
     suggestions: List[str] = Field(default_factory=list)
+    # Framework-related fields
+    framework_step: Optional[int] = None
+    framework_phase: Optional[str] = None
+    framework_progress: Optional[dict] = None
+    ready_for_development: bool = False
 
 
 class Project(BaseModel):
@@ -53,14 +77,39 @@ class Project(BaseModel):
     updated_at: datetime
     files: List[str] = Field(default_factory=list)
     status: Literal["active", "completed", "archived"] = "active"
+    # Framework tracking
+    phase: ProjectPhase = ProjectPhase.IDEATION
+    framework_step: int = 1
+    framework_completed: bool = False
+    framework_summary: Optional[dict] = None
 
 
 class ProjectCreate(BaseModel):
     """Request model for creating a project."""
     name: str
-    description: str
+    description: str  # This is the user's startup idea
     tech_stack: TechStack = TechStack.PYTHON
     ai_provider: AIProvider = AIProvider.CLAUDE
+    skip_framework: bool = False  # Allow advanced users to skip framework
+
+
+class FrameworkStepUpdate(BaseModel):
+    """Request model for updating a framework step."""
+    project_id: str
+    step_number: int
+    user_responses: dict
+    ai_analysis: str
+
+
+class FrameworkProgress(BaseModel):
+    """Response model for framework progress."""
+    current_step: int
+    current_phase: str
+    completed_steps: int
+    total_steps: int = 24
+    progress_percentage: int
+    ready_for_development: bool
+    phases_completed: dict
 
 
 class CodeGenerationRequest(BaseModel):
