@@ -41,6 +41,21 @@ interface StepData {
   ai_analysis: string | null;
 }
 
+const normalizeStep = (step: any): StepData => {
+  const number = step?.number ?? step?.step_number ?? 0;
+  return {
+    number,
+    name: step?.name ?? '',
+    phase: step?.phase ?? 'customer',
+    description: step?.description ?? '',
+    key_questions: Array.isArray(step?.key_questions) ? step.key_questions : [],
+    deliverables: Array.isArray(step?.deliverables) ? step.deliverables : [],
+    status: step?.status ?? 'not_started',
+    user_responses: step?.user_responses ?? {},
+    ai_analysis: step?.ai_analysis ?? null,
+  };
+};
+
 export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
   projectId,
   idea,
@@ -65,7 +80,7 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
       
       if (result.success) {
         setIsInitialized(true);
-        setCurrentStepData(result.step_details);
+        setCurrentStepData(normalizeStep(result.step_details));
         
         // Fetch initial progress
         const progress = await frameworkAPI.getProgress(projectId);
@@ -108,7 +123,7 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
         
         // Get current step data
         const { step } = await frameworkAPI.getCurrentStep(projectId);
-        setCurrentStepData(step);
+        setCurrentStepData(normalizeStep(step));
       } else {
         // No session exists, initialize new one
         await initializeFramework();
@@ -142,14 +157,17 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
       
       if (result.success) {
         if (result.progress) {
-          setFrameworkState({
-            currentStep: result.progress.current_step,
-            currentPhase: result.progress.current_phase,
-            completedSteps: result.progress.completed_steps,
-            totalSteps: result.progress.total_steps,
-            progressPercentage: result.progress.progress_percentage,
-            readyForDevelopment: result.progress.ready_for_development,
-            phasesCompleted: result.progress.phases_completed,
+          setFrameworkState((prev) => {
+            const previous = prev;
+            return {
+              currentStep: result.progress.current_step,
+              currentPhase: previous?.currentPhase ?? 'customer',
+              completedSteps: result.progress.completed_steps,
+              totalSteps: result.progress.total_steps,
+              progressPercentage: result.progress.progress_percentage,
+              readyForDevelopment: result.progress.ready_for_development,
+              phasesCompleted: previous?.phasesCompleted ?? {},
+            };
           });
         }
         
@@ -157,7 +175,7 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
           // Framework complete!
           setCurrentStepData(null);
         } else if (result.next_step) {
-          setCurrentStepData(result.next_step);
+          setCurrentStepData(normalizeStep(result.next_step));
         }
         
         setCanComplete(false);
@@ -181,19 +199,22 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
       
       if (result.success) {
         if (result.progress) {
-          setFrameworkState({
-            currentStep: result.progress.current_step,
-            currentPhase: result.progress.current_phase,
-            completedSteps: result.progress.completed_steps,
-            totalSteps: result.progress.total_steps,
-            progressPercentage: result.progress.progress_percentage,
-            readyForDevelopment: result.progress.ready_for_development,
-            phasesCompleted: result.progress.phases_completed,
+          setFrameworkState((prev) => {
+            const previous = prev;
+            return {
+              currentStep: result.progress.current_step,
+              currentPhase: previous?.currentPhase ?? 'customer',
+              completedSteps: result.progress.completed_steps,
+              totalSteps: result.progress.total_steps,
+              progressPercentage: result.progress.progress_percentage,
+              readyForDevelopment: result.progress.ready_for_development,
+              phasesCompleted: previous?.phasesCompleted ?? {},
+            };
           });
         }
         
         if (result.next_step) {
-          setCurrentStepData(result.next_step);
+          setCurrentStepData(normalizeStep(result.next_step));
         } else {
           setCurrentStepData(null);
         }
@@ -211,7 +232,7 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
     
     try {
       const { step } = await frameworkAPI.getStepDetails(projectId, currentStepData.number - 1);
-      setCurrentStepData(step);
+      setCurrentStepData(normalizeStep(step));
     } catch (err) {
       console.error('Failed to go to previous step:', err);
     }
