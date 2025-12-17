@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     database_url: Optional[str] = None
     
     # Email settings
+    resend_api_key: Optional[str] = None
+    resend_from: Optional[str] = None
+    resend_from_name: str = "Intelekt"
+
+    # Email settings (SMTP fallback)
     mail_username: Optional[str] = None
     mail_password: Optional[str] = None
     mail_from: Optional[str] = None

@@ -2,6 +2,7 @@ from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
 from pydantic import EmailStr
 from config import settings
 from typing import Optional
+import httpx
 
 # Email configuration
 def get_mail_config() -> Optional[ConnectionConfig]:
@@ -23,13 +24,67 @@ def get_mail_config() -> Optional[ConnectionConfig]:
     )
 
 
-async def send_verification_email(email: EmailStr, token: str) -> bool:
-    """Send email verification link."""
+def _get_resend_from() -> Optional[str]:
+    if not settings.resend_from:
+        return None
+    if settings.resend_from_name:
+        return f"{settings.resend_from_name} <{settings.resend_from}>"
+    return settings.resend_from
+
+
+async def _send_via_resend(to_email: EmailStr, subject: str, html: str) -> bool:
+    if not settings.resend_api_key:
+        return False
+
+    from_value = _get_resend_from()
+    if not from_value:
+        return False
+
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                "https://api.resend.com/emails",
+                headers={
+                    "Authorization": f"Bearer {settings.resend_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "from": from_value,
+                    "to": [str(to_email)],
+                    "subject": subject,
+                    "html": html,
+                },
+            )
+            response.raise_for_status()
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Failed to send via Resend: {e}")
+        return False
+
+
+async def _send_via_smtp(to_email: EmailStr, subject: str, html: str) -> bool:
     config = get_mail_config()
     if not config:
-        print(f"[EMAIL] SMTP not configured. Verification token for {email}: {token}")
         return False
-    
+
+    message = MessageSchema(
+        subject=subject,
+        recipients=[to_email],
+        body=html,
+        subtype=MessageType.html,
+    )
+
+    try:
+        fm = FastMail(config)
+        await fm.send_message(message)
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Failed to send via SMTP: {e}")
+        return False
+
+
+async def send_verification_email(email: EmailStr, token: str) -> bool:
+    """Send email verification link."""
     verification_url = f"{settings.frontend_url}/verify-email?token={token}"
     
     html = f"""
@@ -70,29 +125,20 @@ async def send_verification_email(email: EmailStr, token: str) -> bool:
     </html>
     """
     
-    message = MessageSchema(
-        subject="Verify Your Email - Intelekt",
-        recipients=[email],
-        body=html,
-        subtype=MessageType.html
-    )
-    
-    try:
-        fm = FastMail(config)
-        await fm.send_message(message)
+    subject = "Verify Your Email - Intelekt"
+
+    if await _send_via_resend(email, subject, html):
         return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send verification email: {e}")
-        return False
+
+    if await _send_via_smtp(email, subject, html):
+        return True
+
+    print(f"[EMAIL] Email not sent (Resend/SMTP not configured). Verification token for {email}: {token}")
+    return False
 
 
 async def send_password_reset_email(email: EmailStr, token: str) -> bool:
     """Send password reset link."""
-    config = get_mail_config()
-    if not config:
-        print(f"[EMAIL] SMTP not configured. Reset token for {email}: {token}")
-        return False
-    
     reset_url = f"{settings.frontend_url}/reset-password?token={token}"
     
     html = f"""
@@ -135,17 +181,13 @@ async def send_password_reset_email(email: EmailStr, token: str) -> bool:
     </html>
     """
     
-    message = MessageSchema(
-        subject="Reset Your Password - Intelekt",
-        recipients=[email],
-        body=html,
-        subtype=MessageType.html
-    )
-    
-    try:
-        fm = FastMail(config)
-        await fm.send_message(message)
+    subject = "Reset Your Password - Intelekt"
+
+    if await _send_via_resend(email, subject, html):
         return True
-    except Exception as e:
-        print(f"[EMAIL] Failed to send password reset email: {e}")
-        return False
+
+    if await _send_via_smtp(email, subject, html):
+        return True
+
+    print(f"[EMAIL] Email not sent (Resend/SMTP not configured). Reset token for {email}: {token}")
+    return False
