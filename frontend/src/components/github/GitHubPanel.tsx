@@ -13,7 +13,10 @@ import {
   Check,
   X,
   Play,
-  Square
+  Square,
+  Upload,
+  Plus,
+  Loader2
 } from 'lucide-react';
 
 interface Repository {
@@ -77,14 +80,27 @@ interface WorkflowRun {
 interface GitHubPanelProps {
   projectId: string;
   userId: string;
+  files?: Record<string, string>;
   onRepoSelect?: (repo: Repository) => void;
+  onPushSuccess?: (result: PushResult) => void;
+}
+
+interface PushResult {
+  success: boolean;
+  commit_sha?: string;
+  commit_url?: string;
+  files_pushed?: number;
+  branch?: string;
+  error?: string;
 }
 
 type TabType = 'repos' | 'branches' | 'prs' | 'issues' | 'actions';
 
 export const GitHubPanel: React.FC<GitHubPanelProps> = ({
   userId,
+  files,
   onRepoSelect,
+  onPushSuccess,
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('repos');
   const [isConnected, setIsConnected] = useState(false);
@@ -107,6 +123,20 @@ export const GitHubPanel: React.FC<GitHubPanelProps> = ({
   // Token modal
   const [showTokenModal, setShowTokenModal] = useState(false);
   const [tokenInput, setTokenInput] = useState('');
+
+  // Push modal
+  const [showPushModal, setShowPushModal] = useState(false);
+  const [isPushing, setIsPushing] = useState(false);
+  const [commitMessage, setCommitMessage] = useState('Update from Intelekt');
+  const [targetBranch, setTargetBranch] = useState('main');
+  const [pushResult, setPushResult] = useState<PushResult | null>(null);
+  
+  // Create repo modal
+  const [showCreateRepoModal, setShowCreateRepoModal] = useState(false);
+  const [newRepoName, setNewRepoName] = useState('');
+  const [newRepoDescription, setNewRepoDescription] = useState('');
+  const [newRepoPrivate, setNewRepoPrivate] = useState(false);
+  const [isCreatingRepo, setIsCreatingRepo] = useState(false);
 
   const handleConnect = async () => {
     if (!tokenInput.trim()) return;
@@ -244,6 +274,91 @@ export const GitHubPanel: React.FC<GitHubPanelProps> = ({
     }
     if (status === 'in_progress') return 'text-yellow-500';
     return 'text-gray-500';
+  };
+
+  const handlePushToRepo = async () => {
+    if (!selectedRepo || !files || Object.keys(files).length === 0) return;
+    
+    setIsPushing(true);
+    setPushResult(null);
+    
+    try {
+      const [owner, repo] = selectedRepo.full_name.split('/');
+      const res = await fetch(`/api/github/push/${owner}/${repo}?user_id=${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files,
+          commit_message: commitMessage,
+          branch: targetBranch,
+          use_tree_api: true
+        })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok && result.success) {
+        setPushResult(result);
+        onPushSuccess?.(result);
+      } else {
+        setPushResult({ success: false, error: result.detail || 'Push failed' });
+      }
+    } catch (err) {
+      setPushResult({ success: false, error: 'Failed to push to repository' });
+    } finally {
+      setIsPushing(false);
+    }
+  };
+
+  const handleCreateAndPush = async () => {
+    if (!newRepoName.trim() || !files || Object.keys(files).length === 0) return;
+    
+    setIsCreatingRepo(true);
+    setPushResult(null);
+    
+    try {
+      // Get authenticated user to get owner name
+      const userRes = await fetch(`/api/github/user?user_id=${userId}`);
+      const userData = await userRes.json();
+      const owner = userData.user?.login;
+      
+      if (!owner) {
+        setPushResult({ success: false, error: 'Could not get GitHub username' });
+        return;
+      }
+      
+      const res = await fetch(`/api/github/push/${owner}/${newRepoName}/create-and-push?user_id=${userId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          files,
+          commit_message: commitMessage || 'Initial commit from Intelekt',
+          description: newRepoDescription,
+          private: newRepoPrivate
+        })
+      });
+      
+      const result = await res.json();
+      
+      if (res.ok && result.success) {
+        setPushResult({
+          success: true,
+          commit_sha: result.push_result?.commit_sha,
+          commit_url: result.push_result?.commit_url,
+          files_pushed: result.push_result?.files_pushed,
+          branch: 'main'
+        });
+        setShowCreateRepoModal(false);
+        loadRepos(); // Refresh repos list
+        onPushSuccess?.(result.push_result);
+      } else {
+        setPushResult({ success: false, error: result.detail || 'Failed to create repository' });
+      }
+    } catch (err) {
+      setPushResult({ success: false, error: 'Failed to create repository and push' });
+    } finally {
+      setIsCreatingRepo(false);
+    }
   };
 
   if (!isConnected) {
@@ -597,6 +712,182 @@ export const GitHubPanel: React.FC<GitHubPanelProps> = ({
           </div>
         )}
       </div>
+
+      {/* Push Actions Bar */}
+      {files && Object.keys(files).length > 0 && (
+        <div className="px-4 py-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-sm text-gray-500">
+              {Object.keys(files).length} files ready to push
+            </span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setShowCreateRepoModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+              >
+                <Plus className="w-4 h-4" />
+                New Repo
+              </button>
+              <button
+                onClick={() => setShowPushModal(true)}
+                disabled={!selectedRepo}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Upload className="w-4 h-4" />
+                Push to {selectedRepo?.name || 'Repo'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Push Modal */}
+      {showPushModal && selectedRepo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Upload className="w-5 h-5" />
+              Push to {selectedRepo.full_name}
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Commit Message</label>
+                <input
+                  type="text"
+                  value={commitMessage}
+                  onChange={(e) => setCommitMessage(e.target.value)}
+                  placeholder="Update from Intelekt"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Branch</label>
+                <input
+                  type="text"
+                  value={targetBranch}
+                  onChange={(e) => setTargetBranch(e.target.value)}
+                  placeholder="main"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                />
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                {Object.keys(files || {}).length} files will be pushed
+              </div>
+              
+              {pushResult && (
+                <div className={`p-3 rounded-lg ${pushResult.success ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400'}`}>
+                  {pushResult.success ? (
+                    <div>
+                      <p className="font-medium">✓ Successfully pushed {pushResult.files_pushed} files!</p>
+                      {pushResult.commit_url && (
+                        <a href={pushResult.commit_url} target="_blank" rel="noopener noreferrer" className="text-sm underline">
+                          View commit →
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <p>✗ {pushResult.error}</p>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2 justify-end mt-6">
+              <button
+                onClick={() => { setShowPushModal(false); setPushResult(null); }}
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePushToRepo}
+                disabled={isPushing}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {isPushing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                {isPushing ? 'Pushing...' : 'Push'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Repo Modal */}
+      {showCreateRepoModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Create New Repository
+            </h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Repository Name *</label>
+                <input
+                  type="text"
+                  value={newRepoName}
+                  onChange={(e) => setNewRepoName(e.target.value.replace(/[^a-zA-Z0-9-_]/g, '-'))}
+                  placeholder="my-awesome-project"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                />
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-1">Description</label>
+                <input
+                  type="text"
+                  value={newRepoDescription}
+                  onChange={(e) => setNewRepoDescription(e.target.value)}
+                  placeholder="A brief description of your project"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg"
+                />
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="private-repo"
+                  checked={newRepoPrivate}
+                  onChange={(e) => setNewRepoPrivate(e.target.checked)}
+                  className="rounded"
+                />
+                <label htmlFor="private-repo" className="text-sm">Make repository private</label>
+              </div>
+              
+              <div className="text-sm text-gray-500">
+                {Object.keys(files || {}).length} files will be pushed after creation
+              </div>
+              
+              {pushResult && !pushResult.success && (
+                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
+                  <p>✗ {pushResult.error}</p>
+                </div>
+              )}
+            </div>
+            
+            <div className="flex gap-2 justify-end mt-6">
+              <button
+                onClick={() => { setShowCreateRepoModal(false); setPushResult(null); }}
+                className="px-4 py-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateAndPush}
+                disabled={isCreatingRepo || !newRepoName.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50"
+              >
+                {isCreatingRepo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                {isCreatingRepo ? 'Creating...' : 'Create & Push'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

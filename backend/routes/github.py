@@ -979,3 +979,149 @@ async def create_gist(
         return {"success": True, "gist": gist}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+# ============== PROJECT PUSH ==============
+
+@router.post("/push/{owner}/{repo}")
+async def push_project_to_repo(
+    owner: str,
+    repo: str,
+    user_id: str = Query(...),
+    files: Dict[str, str] = Body(...),
+    commit_message: str = Body("Update from Intelekt"),
+    branch: str = Body("main"),
+    use_tree_api: bool = Body(True)
+):
+    """
+    Push multiple files to a GitHub repository.
+    
+    Args:
+        owner: Repository owner
+        repo: Repository name
+        user_id: User ID for authentication
+        files: Dict of file_path -> content
+        commit_message: Commit message
+        branch: Target branch (default: main)
+        use_tree_api: Use Git Data API for single commit (default: True, more efficient)
+    
+    Returns:
+        Push result with commit details
+    """
+    token = github_service.get_token(user_id)
+    if not token:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Please connect your GitHub account first.")
+    
+    if not files:
+        raise HTTPException(status_code=400, detail="No files to push")
+    
+    try:
+        if use_tree_api:
+            result = await github_service.push_project_as_tree(
+                token=token,
+                owner=owner,
+                repo=repo,
+                files=files,
+                commit_message=commit_message,
+                branch=branch
+            )
+        else:
+            result = await github_service.push_project(
+                token=token,
+                owner=owner,
+                repo=repo,
+                files=files,
+                commit_message=commit_message,
+                branch=branch
+            )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Push failed"))
+        
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/push/{owner}/{repo}/create-and-push")
+async def create_repo_and_push(
+    owner: str,
+    repo: str,
+    user_id: str = Query(...),
+    files: Dict[str, str] = Body(...),
+    commit_message: str = Body("Initial commit from Intelekt"),
+    description: str = Body(""),
+    private: bool = Body(False)
+):
+    """
+    Create a new repository and push files to it.
+    
+    Args:
+        owner: Repository owner (should match authenticated user)
+        repo: Repository name to create
+        user_id: User ID for authentication
+        files: Dict of file_path -> content
+        commit_message: Commit message
+        description: Repository description
+        private: Whether the repository should be private
+    
+    Returns:
+        Repository creation and push results
+    """
+    token = github_service.get_token(user_id)
+    if not token:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Please connect your GitHub account first.")
+    
+    if not files:
+        raise HTTPException(status_code=400, detail="No files to push")
+    
+    try:
+        # Check if repo already exists
+        try:
+            existing = await github_service.get_repo(token, owner, repo)
+            if existing:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=f"Repository {owner}/{repo} already exists. Use the push endpoint instead."
+                )
+        except Exception as e:
+            if "404" not in str(e):
+                raise
+            # Repo doesn't exist, continue with creation
+        
+        # Create the repository
+        new_repo = await github_service.create_repo(
+            token=token,
+            name=repo,
+            description=description,
+            private=private,
+            auto_init=True  # Initialize with README
+        )
+        
+        # Wait a moment for GitHub to initialize the repo
+        import asyncio
+        await asyncio.sleep(1)
+        
+        # Push files to the new repository
+        result = await github_service.push_project_as_tree(
+            token=token,
+            owner=owner,
+            repo=repo,
+            files=files,
+            commit_message=commit_message,
+            branch="main"
+        )
+        
+        return {
+            "success": True,
+            "repo_created": True,
+            "repo_url": new_repo.get("html_url"),
+            "repo_name": new_repo.get("full_name"),
+            "push_result": result
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

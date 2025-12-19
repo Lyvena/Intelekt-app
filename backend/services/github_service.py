@@ -953,6 +953,172 @@ class GitHubService:
     ) -> Dict[str, Any]:
         """Get community profile metrics."""
         return await self._request("GET", f"/repos/{owner}/{repo}/community/profile", token)
+    
+    # ============== PROJECT PUSH ==============
+    
+    async def push_project(
+        self,
+        token: str,
+        owner: str,
+        repo: str,
+        files: Dict[str, str],
+        commit_message: str = "Update from Intelekt",
+        branch: str = "main"
+    ) -> Dict[str, Any]:
+        """
+        Push multiple files to a GitHub repository.
+        
+        Args:
+            token: GitHub access token
+            owner: Repository owner
+            repo: Repository name
+            files: Dict of file_path -> content
+            commit_message: Commit message
+            branch: Target branch (default: main)
+        
+        Returns:
+            Dict with push results
+        """
+        results = {
+            "success": True,
+            "pushed_files": [],
+            "failed_files": [],
+            "commit_message": commit_message
+        }
+        
+        for file_path, content in files.items():
+            try:
+                # Check if file exists to get its SHA
+                sha = None
+                try:
+                    existing = await self.get_contents(token, owner, repo, file_path, ref=branch)
+                    if isinstance(existing, dict) and "sha" in existing:
+                        sha = existing["sha"]
+                except:
+                    pass  # File doesn't exist, will create new
+                
+                # Create or update the file
+                await self.create_or_update_file(
+                    token=token,
+                    owner=owner,
+                    repo=repo,
+                    path=file_path,
+                    content=content,
+                    message=f"{commit_message}: {file_path}",
+                    branch=branch,
+                    sha=sha
+                )
+                results["pushed_files"].append(file_path)
+            except Exception as e:
+                results["failed_files"].append({"path": file_path, "error": str(e)})
+        
+        if results["failed_files"]:
+            results["success"] = len(results["failed_files"]) < len(files)
+        
+        return results
+    
+    async def push_project_as_tree(
+        self,
+        token: str,
+        owner: str,
+        repo: str,
+        files: Dict[str, str],
+        commit_message: str = "Update from Intelekt",
+        branch: str = "main"
+    ) -> Dict[str, Any]:
+        """
+        Push multiple files to GitHub as a single commit using Git Data API.
+        This is more efficient for pushing many files at once.
+        
+        Args:
+            token: GitHub access token
+            owner: Repository owner
+            repo: Repository name  
+            files: Dict of file_path -> content
+            commit_message: Commit message
+            branch: Target branch (default: main)
+        
+        Returns:
+            Dict with commit details
+        """
+        try:
+            # 1. Get the latest commit SHA on the branch
+            branch_info = await self.get_branch(token, owner, repo, branch)
+            base_sha = branch_info["commit"]["sha"]
+            base_tree_sha = branch_info["commit"]["commit"]["tree"]["sha"]
+            
+            # 2. Create blobs for each file
+            tree_items = []
+            for file_path, content in files.items():
+                # Create blob
+                blob_data = {
+                    "content": content,
+                    "encoding": "utf-8"
+                }
+                blob_response = await self._request(
+                    "POST", 
+                    f"/repos/{owner}/{repo}/git/blobs", 
+                    token, 
+                    data=blob_data
+                )
+                
+                tree_items.append({
+                    "path": file_path,
+                    "mode": "100644",  # Regular file
+                    "type": "blob",
+                    "sha": blob_response["sha"]
+                })
+            
+            # 3. Create a new tree
+            tree_data = {
+                "base_tree": base_tree_sha,
+                "tree": tree_items
+            }
+            tree_response = await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/git/trees",
+                token,
+                data=tree_data
+            )
+            
+            # 4. Create a new commit
+            commit_data = {
+                "message": commit_message,
+                "tree": tree_response["sha"],
+                "parents": [base_sha]
+            }
+            commit_response = await self._request(
+                "POST",
+                f"/repos/{owner}/{repo}/git/commits",
+                token,
+                data=commit_data
+            )
+            
+            # 5. Update the branch reference
+            ref_data = {
+                "sha": commit_response["sha"],
+                "force": False
+            }
+            await self._request(
+                "PATCH",
+                f"/repos/{owner}/{repo}/git/refs/heads/{branch}",
+                token,
+                data=ref_data
+            )
+            
+            return {
+                "success": True,
+                "commit_sha": commit_response["sha"],
+                "commit_url": f"https://github.com/{owner}/{repo}/commit/{commit_response['sha']}",
+                "files_pushed": len(files),
+                "branch": branch
+            }
+            
+        except Exception as e:
+            return {
+                "success": False,
+                "error": str(e)
+            }
 
 
 # Singleton instance

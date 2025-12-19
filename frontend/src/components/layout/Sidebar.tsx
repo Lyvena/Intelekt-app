@@ -15,6 +15,7 @@ import { useStore } from '../../store/useStore';
 import { projectsAPI } from '../../services/api';
 import type { Project, AIProvider } from '../../types';
 import { cn, formatDate, downloadBlob } from '../../lib/utils';
+import { UsageDisplay } from '../usage';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -226,6 +227,9 @@ export const Sidebar: React.FC = () => {
 
       {/* Footer */}
       <div className="p-4 border-t border-border/50 space-y-3">
+        {/* Usage Display */}
+        <UsageDisplay compact={false} showUpgrade={true} />
+        
         {/* AI Provider Selector */}
         <div>
           <label className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">

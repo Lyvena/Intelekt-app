@@ -1,13 +1,17 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import List, Dict, Optional
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
-from services import ai_service, chroma_service, code_generator
+from models.database import get_db
+from models.database.user import User
+from services import ai_service, chroma_service, code_generator, usage_service
 from services.context_service import context_service
 from services.codebase_indexer import codebase_indexer
+from utils.auth import get_current_user
 from datetime import datetime
 import json
 
@@ -17,7 +21,12 @@ limiter = Limiter(key_func=get_remote_address)
 
 @router.post("", response_model=ChatResponse)
 @limiter.limit("30/minute")
-async def chat(request: Request, chat_request: ChatRequest):
+async def chat(
+    request: Request, 
+    chat_request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Handle chat messages and generate responses.
     
@@ -26,6 +35,11 @@ async def chat(request: Request, chat_request: ChatRequest):
     Rate limited to 30 requests per minute.
     """
     try:
+        # Check usage limits before processing
+        usage_service.enforce_generation_limit(db, current_user)
+        
+        # Check AI provider access
+        usage_service.enforce_ai_provider_access(current_user, chat_request.ai_provider.value)
         # Add user message to conversation history
         messages = chat_request.conversation_history + [
             ChatMessage(
@@ -82,6 +96,9 @@ async def chat(request: Request, chat_request: ChatRequest):
         # Generate suggestions
         suggestions = _generate_suggestions(chat_request.message, chat_request.tech_stack)
         
+        # Increment usage count after successful generation
+        usage_stats = usage_service.increment_usage(db, current_user)
+        
         return ChatResponse(
             message=response_text,
             code_generated=code_generated,
@@ -90,21 +107,35 @@ async def chat(request: Request, chat_request: ChatRequest):
             suggestions=suggestions
         )
     
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/stream")
 @limiter.limit("30/minute")
-async def chat_stream(request: Request, chat_request: ChatRequest):
+async def chat_stream(
+    request: Request, 
+    chat_request: ChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
     """
     Stream chat responses in real-time using Server-Sent Events.
     
     This endpoint provides real-time streaming of AI responses for better UX.
     Rate limited to 30 requests per minute.
     """
+    # Check usage limits before processing (outside generator to return proper HTTP errors)
+    usage_service.enforce_generation_limit(db, current_user)
+    usage_service.enforce_ai_provider_access(current_user, chat_request.ai_provider.value)
+    
     async def generate():
         try:
+            # Increment usage at start of stream
+            usage_service.increment_usage(db, current_user)
+            
             # Add user message to conversation history
             messages = chat_request.conversation_history + [
                 ChatMessage(

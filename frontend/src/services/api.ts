@@ -1788,4 +1788,92 @@ export const authAPI = {
   },
 };
 
+export const usageAPI = {
+  // Get current usage stats
+  getUsage: async (): Promise<{
+    tier: string;
+    generations: {
+      used: number;
+      limit: number;
+      remaining: number;
+      unlimited: boolean;
+      percentage: number;
+    };
+    total_generations: number;
+    reset_date: string;
+    days_until_reset: number;
+    limits: {
+      max_projects: number;
+      max_files_per_project: number;
+      ai_providers: string[];
+    };
+    features: string[];
+    subscription: {
+      tier: string;
+      started_at: string | null;
+      expires_at: string | null;
+      is_active: boolean;
+    };
+  }> => {
+    const response = await api.get('/api/usage');
+    return response.data;
+  },
+
+  // Check if user can generate
+  canGenerate: async (): Promise<{
+    allowed: boolean;
+    tier: string;
+    used: number;
+    limit: number;
+    remaining: number;
+    message?: string;
+    upgrade_url?: string;
+  }> => {
+    const response = await api.get('/api/usage/can-generate');
+    return response.data;
+  },
+
+  // Get all tier information
+  getTiers: async (): Promise<{
+    tiers: Array<{
+      name: string;
+      display_name: string;
+      generations_per_month: number;
+      max_projects: number;
+      max_files_per_project: number;
+      ai_providers: string[];
+      features: string[];
+      price_monthly: number;
+      price_yearly: number;
+      is_popular: boolean;
+    }>;
+  }> => {
+    const response = await api.get('/api/usage/tiers');
+    return response.data;
+  },
+
+  // Check provider access
+  checkProviderAccess: async (provider: string): Promise<{
+    provider: string;
+    has_access: boolean;
+    tier: string;
+    available_providers: string[];
+    upgrade_required: boolean;
+  }> => {
+    const response = await api.post(`/api/usage/check-provider/${provider}`);
+    return response.data;
+  },
+
+  // Get usage history
+  getHistory: async (days: number = 30): Promise<{
+    period_days: number;
+    daily_usage: Array<{ date: string; count: number }>;
+    provider_breakdown: Record<string, number>;
+    total: number;
+  }> => {
+    const response = await api.get(`/api/usage/history?days=${days}`);
+    return response.data;
+  },
+};
+
 export default api;
