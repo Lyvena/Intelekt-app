@@ -8,11 +8,12 @@ import { FileExplorer } from './components/editor/FileExplorer';
 import { NewProjectModal } from './components/modals/NewProjectModal';
 import { DependenciesPanel } from './components/dependencies/DependenciesPanel';
 import { ExportPanel } from './components/export/ExportPanel';
-import { Terminal, Package, Download, GitBranch, Eye, EyeOff, Bug, Coins } from 'lucide-react';
+import { Terminal, Package, Download, GitBranch, Eye, EyeOff, Bug, Coins, History } from 'lucide-react';
 import { UndoRedoToolbar } from './components/editor/UndoRedoToolbar';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import { AIDebugButton, ErrorPanel } from './components/debug';
 import { UsagePanel } from './components/usage';
+import { VersionHistoryPanel } from './components/history';
 import {
   CollaborativeEditorWithSuspense,
   LivePreviewWithSuspense,
@@ -21,7 +22,7 @@ import {
   GitPanelWithSuspense,
 } from './components/LazyComponents';
 
-type BottomPanelType = 'none' | 'terminal' | 'dependencies' | 'export' | 'git' | 'debug' | 'usage';
+type BottomPanelType = 'none' | 'terminal' | 'dependencies' | 'export' | 'git' | 'debug' | 'usage' | 'history';
 
 function App() {
   const { 
@@ -162,6 +163,7 @@ function App() {
                     {bottomPanel === 'git' && <GitPanelWithSuspense />}
                     {bottomPanel === 'debug' && <ErrorPanel />}
                     {bottomPanel === 'usage' && <UsagePanel />}
+                    {bottomPanel === 'history' && <VersionHistoryPanel />}
                   </div>
                 </Panel>
               </>
@@ -173,115 +175,65 @@ function App() {
 
         {/* Bottom Toolbar */}
         {currentProject && (
-          <div className="h-12 border-t border-border/50 bg-gradient-to-r from-card via-card to-secondary/20 flex items-center px-3 gap-1">
+          <div className="h-14 border-t border-border/30 bg-gradient-to-r from-card via-card/95 to-card flex items-center px-4 gap-2 backdrop-blur-sm">
             {/* Left side - Panel toggles */}
-            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1">
-              <button
-                onClick={() => toggleBottomPanel('terminal')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'terminal' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="Terminal"
-              >
-                <Terminal className="w-4 h-4" />
-                <span className="hidden sm:inline">Terminal</span>
-              </button>
-              <button
-                onClick={() => toggleBottomPanel('dependencies')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'dependencies' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="Dependencies"
-              >
-                <Package className="w-4 h-4" />
-                <span className="hidden sm:inline">Deps</span>
-              </button>
-              <button
-                onClick={() => toggleBottomPanel('git')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'git' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="Git"
-              >
-                <GitBranch className="w-4 h-4" />
-                <span className="hidden sm:inline">Git</span>
-              </button>
-              <button
-                onClick={() => toggleBottomPanel('export')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'export' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="Export"
-              >
-                <Download className="w-4 h-4" />
-                <span className="hidden sm:inline">Export</span>
-              </button>
-              <button
-                onClick={() => toggleBottomPanel('debug')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'debug' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="Debug"
-              >
-                <Bug className="w-4 h-4" />
-                <span className="hidden sm:inline">Debug</span>
-              </button>
-              <button
-                onClick={() => toggleBottomPanel('usage')}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
-                  bottomPanel === 'usage' 
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
-                }`}
-                title="AI Usage"
-              >
-                <Coins className="w-4 h-4" />
-                <span className="hidden sm:inline">Usage</span>
-              </button>
+            <div className="action-group">
+              {[
+                { id: 'terminal', icon: Terminal, label: 'Terminal' },
+                { id: 'dependencies', icon: Package, label: 'Deps' },
+                { id: 'git', icon: GitBranch, label: 'Git' },
+                { id: 'export', icon: Download, label: 'Export' },
+                { id: 'debug', icon: Bug, label: 'Debug' },
+                { id: 'usage', icon: Coins, label: 'Usage' },
+                { id: 'history', icon: History, label: 'History' },
+              ].map(({ id, icon: Icon, label }) => (
+                <button
+                  key={id}
+                  onClick={() => toggleBottomPanel(id as BottomPanelType)}
+                  className={`toolbar-btn ${
+                    bottomPanel === id ? 'toolbar-btn-active' : 'toolbar-btn-inactive'
+                  }`}
+                  title={label}
+                >
+                  <Icon className="w-4 h-4" />
+                  <span className="hidden lg:inline">{label}</span>
+                </button>
+              ))}
             </div>
 
+            <div className="separator-dot mx-1" />
+
             {/* Preview Toggle */}
-            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 ml-2">
+            <div className="action-group">
               <button
                 onClick={() => setShowInlinePreview(!showInlinePreview)}
-                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                className={`toolbar-btn ${
                   showInlinePreview 
-                    ? 'bg-green-600 text-white shadow-md shadow-green-600/25' 
-                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                    ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white shadow-lg shadow-green-600/30' 
+                    : 'toolbar-btn-inactive'
                 }`}
                 title={showInlinePreview ? "Hide Preview" : "Show Preview"}
               >
                 {showInlinePreview ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                <span className="hidden sm:inline">Preview</span>
+                <span className="hidden lg:inline">Preview</span>
               </button>
             </div>
 
             {/* AI Debug Button */}
-            <div className="ml-2">
+            <div className="ml-1">
               <AIDebugButton />
             </div>
 
             {/* Undo/Redo */}
-            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 ml-2">
+            <div className="action-group ml-1">
               <UndoRedoToolbar projectId={currentProject?.id} />
             </div>
             
             {/* Right side - Status */}
-            <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+            <div className="ml-auto flex items-center gap-4">
               <OfflineIndicator />
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-                <span>Ready</span>
+              <div className="live-indicator">
+                <span className="font-medium">Ready</span>
               </div>
             </div>
           </div>

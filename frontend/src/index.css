@@ -258,3 +258,312 @@ input::placeholder,
 textarea::placeholder {
   @apply text-muted-foreground/60;
 }
+
+/* Visual Select-to-Edit highlight in Monaco editor */
+.select-to-edit-highlight {
+  background-color: rgba(168, 85, 247, 0.25) !important;
+  border-left: 3px solid #a855f7 !important;
+  animation: select-highlight-pulse 1s ease-in-out infinite;
+}
+
+.select-to-edit-glyph {
+  background-color: #a855f7;
+  border-radius: 50%;
+  width: 8px !important;
+  height: 8px !important;
+  margin-left: 4px;
+  margin-top: 6px;
+}
+
+@keyframes select-highlight-pulse {
+  0%, 100% {
+    background-color: rgba(168, 85, 247, 0.25);
+  }
+  50% {
+    background-color: rgba(168, 85, 247, 0.15);
+  }
+}
+
+/* ============================================
+   ENHANCED UX/UI STYLES
+   ============================================ */
+
+/* Modern toolbar button */
+.toolbar-btn {
+  @apply flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg;
+  @apply transition-all duration-200 ease-out;
+  @apply hover:scale-[1.02] active:scale-[0.98];
+}
+
+.toolbar-btn-active {
+  @apply bg-gradient-to-r from-primary to-primary/80 text-primary-foreground;
+  @apply shadow-lg shadow-primary/30;
+}
+
+.toolbar-btn-inactive {
+  @apply bg-secondary/60 text-muted-foreground;
+  @apply hover:bg-secondary hover:text-foreground;
+}
+
+/* Smooth panel transitions */
+.panel-appear {
+  animation: panel-appear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes panel-appear {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Shimmer loading effect */
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    hsl(var(--secondary)) 0%,
+    hsl(var(--secondary) / 0.5) 50%,
+    hsl(var(--secondary)) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Glow pulse for live indicators */
+.glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 5px currentColor, 0 0 10px currentColor;
+    opacity: 1;
+  }
+  50% {
+    box-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+    opacity: 0.8;
+  }
+}
+
+/* Better icon button */
+.icon-btn {
+  @apply p-2 rounded-lg transition-all duration-200;
+  @apply hover:bg-accent hover:scale-105;
+  @apply active:scale-95;
+}
+
+.icon-btn-sm {
+  @apply p-1.5 rounded-md;
+}
+
+/* Status badge */
+.status-badge {
+  @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide;
+}
+
+.status-badge-success {
+  @apply bg-green-500/15 text-green-500 border border-green-500/20;
+}
+
+.status-badge-warning {
+  @apply bg-yellow-500/15 text-yellow-500 border border-yellow-500/20;
+}
+
+.status-badge-error {
+  @apply bg-red-500/15 text-red-500 border border-red-500/20;
+}
+
+.status-badge-info {
+  @apply bg-blue-500/15 text-blue-500 border border-blue-500/20;
+}
+
+/* Modern input field */
+.input-modern {
+  @apply w-full px-3 py-2 text-sm rounded-lg;
+  @apply bg-secondary/50 border border-border/50;
+  @apply focus:bg-secondary focus:border-primary/50 focus:ring-2 focus:ring-primary/20;
+  @apply placeholder:text-muted-foreground/50;
+  @apply transition-all duration-200;
+}
+
+/* Card with hover effect */
+.card-interactive {
+  @apply bg-card rounded-xl border border-border/50;
+  @apply transition-all duration-200 ease-out;
+  @apply hover:border-primary/30 hover:shadow-lg hover:shadow-primary/5;
+  @apply hover:-translate-y-0.5;
+}
+
+/* Tooltip style */
+.tooltip {
+  @apply absolute z-50 px-2 py-1 text-xs font-medium;
+  @apply bg-popover text-popover-foreground rounded-md shadow-lg;
+  @apply border border-border/50;
+  animation: tooltip-appear 0.15s ease-out;
+}
+
+@keyframes tooltip-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Floating action button */
+.fab {
+  @apply fixed bottom-6 right-6 p-4 rounded-full;
+  @apply bg-gradient-to-br from-primary to-primary/80;
+  @apply text-primary-foreground shadow-xl shadow-primary/30;
+  @apply hover:shadow-2xl hover:shadow-primary/40 hover:scale-105;
+  @apply active:scale-95;
+  @apply transition-all duration-200;
+}
+
+/* Section divider */
+.divider {
+  @apply h-px bg-gradient-to-r from-transparent via-border to-transparent;
+}
+
+/* Empty state */
+.empty-state {
+  @apply flex flex-col items-center justify-center p-8 text-center;
+}
+
+.empty-state-icon {
+  @apply w-16 h-16 mb-4 text-muted-foreground/30;
+}
+
+.empty-state-title {
+  @apply text-lg font-semibold text-foreground mb-1;
+}
+
+.empty-state-description {
+  @apply text-sm text-muted-foreground max-w-xs;
+}
+
+/* Keyboard shortcut badge */
+.kbd {
+  @apply inline-flex items-center justify-center min-w-[1.5rem] h-5;
+  @apply px-1.5 text-[10px] font-mono font-medium;
+  @apply bg-secondary border border-border/70 rounded;
+  @apply text-muted-foreground;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-1.5 bg-secondary rounded-full overflow-hidden;
+}
+
+.progress-bar-fill {
+  @apply h-full bg-gradient-to-r from-primary to-primary/70 rounded-full;
+  @apply transition-all duration-500 ease-out;
+}
+
+/* Notification dot */
+.notification-dot {
+  @apply absolute -top-0.5 -right-0.5 w-2.5 h-2.5;
+  @apply bg-red-500 rounded-full border-2 border-background;
+  animation: notification-pulse 2s ease-in-out infinite;
+}
+
+@keyframes notification-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* Skeleton loader */
+.skeleton {
+  @apply bg-secondary/70 rounded animate-pulse;
+}
+
+/* Better resize handle */
+.resize-handle {
+  @apply bg-border/50 hover:bg-primary/50;
+  @apply transition-colors duration-150;
+}
+
+.resize-handle:hover {
+  @apply delay-100;
+}
+
+/* Panel header */
+.panel-header {
+  @apply flex items-center justify-between px-3 py-2;
+  @apply border-b border-border/50 bg-card/80 backdrop-blur-sm;
+}
+
+.panel-title {
+  @apply flex items-center gap-2 text-sm font-medium;
+}
+
+/* Action group */
+.action-group {
+  @apply flex items-center gap-1 p-1 rounded-lg bg-secondary/50;
+}
+
+/* Subtle separator */
+.separator-dot {
+  @apply w-1 h-1 rounded-full bg-muted-foreground/30;
+}
+
+/* Live indicator */
+.live-indicator {
+  @apply inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold;
+  @apply bg-green-500/10 text-green-500;
+}
+
+.live-indicator::before {
+  content: '';
+  @apply w-1.5 h-1.5 rounded-full bg-green-500;
+  animation: live-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes live-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+
+/* Tab style */
+.tab {
+  @apply px-3 py-1.5 text-xs font-medium rounded-md;
+  @apply transition-all duration-200;
+}
+
+.tab-active {
+  @apply bg-primary text-primary-foreground shadow-sm;
+}
+
+.tab-inactive {
+  @apply text-muted-foreground hover:text-foreground hover:bg-accent;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  @apply flex items-center gap-1 text-xs text-muted-foreground;
+}
+
+.breadcrumb-separator {
+  @apply text-muted-foreground/40;
+}
+
+.breadcrumb-item {
+  @apply hover:text-foreground transition-colors;
+}
+
+/* Better focus ring */
+.focus-ring {
+  @apply focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-1;
+}

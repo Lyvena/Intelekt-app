@@ -43,10 +43,20 @@ const UserAvatar: React.FC<{ user: User; isCurrentUser?: boolean }> = ({ user, i
 );
 
 export const CollaborativeEditor: React.FC = () => {
-  const { currentProject, currentFile, setCurrentFile, updateFileContent, setShowPreview } = useStore();
+  const { 
+    currentProject, 
+    currentFile, 
+    setCurrentFile, 
+    updateFileContent, 
+    setShowPreview,
+    selectedElement,
+    setSelectedElement,
+    projectFiles,
+  } = useStore();
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const bindingRef = useRef<MonacoBinding | null>(null);
   const yTextRef = useRef<Y.Text | null>(null);
+  const decorationsRef = useRef<string[]>([]);
   
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
@@ -151,6 +161,68 @@ export const CollaborativeEditor: React.FC = () => {
     }
     setIsCollabEnabled(!isCollabEnabled);
   }, [isCollabEnabled]);
+
+  // Handle Visual Select-to-Edit: navigate to selected element in code
+  useEffect(() => {
+    if (!selectedElement || !currentProject) return;
+    
+    // Find the file in project files
+    const files = projectFiles[currentProject.id] || [];
+    const targetFile = files.find(f => f.path === selectedElement.filePath);
+    
+    if (targetFile) {
+      // If different file, switch to it
+      if (!currentFile || currentFile.path !== selectedElement.filePath) {
+        setCurrentFile(targetFile);
+      }
+      
+      // Scroll to and highlight the line after a short delay (for file switch)
+      setTimeout(() => {
+        if (editorRef.current) {
+          const lineNumber = selectedElement.lineNumber;
+          
+          // Scroll to line
+          editorRef.current.revealLineInCenter(lineNumber);
+          
+          // Set cursor position
+          editorRef.current.setPosition({ lineNumber, column: 1 });
+          
+          // Highlight the line with decoration
+          const newDecorations = editorRef.current.deltaDecorations(
+            decorationsRef.current,
+            [{
+              range: {
+                startLineNumber: lineNumber,
+                startColumn: 1,
+                endLineNumber: lineNumber,
+                endColumn: 1,
+              },
+              options: {
+                isWholeLine: true,
+                className: 'select-to-edit-highlight',
+                glyphMarginClassName: 'select-to-edit-glyph',
+              }
+            }]
+          );
+          decorationsRef.current = newDecorations;
+          
+          // Focus editor
+          editorRef.current.focus();
+          
+          // Clear decoration after 3 seconds
+          setTimeout(() => {
+            if (editorRef.current) {
+              editorRef.current.deltaDecorations(decorationsRef.current, []);
+              decorationsRef.current = [];
+            }
+          }, 3000);
+        }
+      }, 100);
+    }
+    
+    // Clear the selected element after handling
+    setSelectedElement(null);
+  }, [selectedElement, currentProject, projectFiles, currentFile, setCurrentFile, setSelectedElement]);
 
   const currentUser = collaborationService.getCurrentUser();
   const otherUsers = collabState.users.filter(u => u.id !== currentUser.id);

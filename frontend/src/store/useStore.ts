@@ -10,6 +10,15 @@ interface FileHistoryEntry {
   description: string;
 }
 
+// Visual Select-to-Edit: selected element info
+export interface SelectedElementInfo {
+  filePath: string;
+  lineNumber: number;
+  tagName: string;
+  elementPath: string; // CSS-like path e.g. "body > div > h1"
+  content?: string;
+}
+
 interface AppState {
   // Projects
   projects: Project[];
@@ -48,6 +57,8 @@ interface AppState {
   pushFileHistory: (projectId: string, description: string) => void;
   undo: (projectId: string) => void;
   redo: (projectId: string) => void;
+  rollbackTo: (projectId: string, index: number) => void;
+  createCheckpoint: (projectId: string, name: string) => void;
   
   // UI State
   showNewProjectModal: boolean;
@@ -56,6 +67,12 @@ interface AppState {
   setShowNewProjectModal: (show: boolean) => void;
   setShowPreview: (show: boolean) => void;
   setSidebarCollapsed: (collapsed: boolean) => void;
+  
+  // Visual Select-to-Edit
+  selectedElement: SelectedElementInfo | null;
+  isSelectMode: boolean;
+  setSelectedElement: (element: SelectedElementInfo | null) => void;
+  setIsSelectMode: (enabled: boolean) => void;
 }
 
 export const useStore = create<AppState>()(
@@ -169,6 +186,40 @@ export const useStore = create<AppState>()(
           fileHistoryIndex: { ...state.fileHistoryIndex, [projectId]: newIndex },
         };
       }),
+      rollbackTo: (projectId, index) => set((state) => {
+        const history = state.fileHistory[projectId] || [];
+        
+        if (index < 0 || index >= history.length) return state;
+        
+        const targetState = history[index];
+        
+        return {
+          projectFiles: { ...state.projectFiles, [projectId]: JSON.parse(JSON.stringify(targetState.files)) },
+          fileHistoryIndex: { ...state.fileHistoryIndex, [projectId]: index },
+        };
+      }),
+      createCheckpoint: (projectId, name) => set((state) => {
+        const currentFiles = state.projectFiles[projectId] || [];
+        const currentHistory = state.fileHistory[projectId] || [];
+        const currentIndex = state.fileHistoryIndex[projectId] ?? -1;
+        
+        // Truncate any future history
+        const newHistory = currentHistory.slice(0, currentIndex + 1);
+        
+        // Add checkpoint with name prefix
+        newHistory.push({
+          files: JSON.parse(JSON.stringify(currentFiles)),
+          timestamp: Date.now(),
+          description: `📌 ${name}`, // Checkpoint marker
+        });
+        
+        const trimmedHistory = newHistory.slice(-50);
+        
+        return {
+          fileHistory: { ...state.fileHistory, [projectId]: trimmedHistory },
+          fileHistoryIndex: { ...state.fileHistoryIndex, [projectId]: trimmedHistory.length - 1 },
+        };
+      }),
       
       // UI State
       showNewProjectModal: false,
@@ -177,6 +228,12 @@ export const useStore = create<AppState>()(
       setShowNewProjectModal: (show) => set({ showNewProjectModal: show }),
       setShowPreview: (show) => set({ showPreview: show }),
       setSidebarCollapsed: (collapsed) => set({ sidebarCollapsed: collapsed }),
+      
+      // Visual Select-to-Edit
+      selectedElement: null,
+      isSelectMode: false,
+      setSelectedElement: (element) => set({ selectedElement: element }),
+      setIsSelectMode: (enabled) => set({ isSelectMode: enabled }),
     }),
     {
       name: 'intelekt-storage',
