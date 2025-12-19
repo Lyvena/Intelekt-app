@@ -6,6 +6,7 @@ from .project_management_service import project_management_service
 from .collaboration_service import collaboration_service
 from .github_service import github_service
 from .integration_service import integration_service
+from .analytics_service import analytics_service
 
 __all__ = [
     "ai_service", 
@@ -15,5 +16,6 @@ __all__ = [
     "project_management_service",
     "collaboration_service",
     "github_service",
-    "integration_service"
+    "integration_service",
+    "analytics_service"
 ]

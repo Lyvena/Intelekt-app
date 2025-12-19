@@ -1575,6 +1575,175 @@ export const frameworkAPI = {
   },
 };
 
+export const analyticsAPI = {
+  // Track a single event
+  trackEvent: async (event: {
+    event_type: string;
+    event_category: string;
+    event_action: string;
+    user_id?: string;
+    session_id?: string;
+    event_label?: string;
+    event_value?: number;
+    properties?: Record<string, unknown>;
+    page_url?: string;
+  }) => {
+    const response = await api.post('/api/analytics/track', event);
+    return response.data;
+  },
+
+  // Track multiple events in batch
+  trackBatch: async (events: Array<{
+    event_type: string;
+    event_category: string;
+    event_action: string;
+    user_id?: string;
+    session_id?: string;
+    event_label?: string;
+    event_value?: number;
+    properties?: Record<string, unknown>;
+    page_url?: string;
+  }>) => {
+    const response = await api.post('/api/analytics/track/batch', { events });
+    return response.data;
+  },
+
+  // Track page view
+  trackPageView: async (data: {
+    page_url: string;
+    user_id?: string;
+    session_id?: string;
+    referrer?: string;
+  }) => {
+    const response = await api.post('/api/analytics/track/pageview', data);
+    return response.data;
+  },
+
+  // Track AI usage
+  trackAIUsage: async (data: {
+    provider: string;
+    request_type: string;
+    input_tokens?: number;
+    output_tokens?: number;
+    response_time_ms?: number;
+    success?: boolean;
+    user_id?: string;
+    project_id?: string;
+    model?: string;
+    error_type?: string;
+  }) => {
+    const response = await api.post('/api/analytics/track/ai-usage', data);
+    return response.data;
+  },
+
+  // Track feature usage
+  trackFeature: async (data: {
+    feature_name: string;
+    feature_category: string;
+    user_id?: string;
+  }) => {
+    const response = await api.post('/api/analytics/track/feature', data);
+    return response.data;
+  },
+
+  // Track funnel step
+  trackFunnelStep: async (data: {
+    funnel_name: string;
+    step_name: string;
+    step_order: number;
+    user_id?: string;
+    session_id?: string;
+    completed?: boolean;
+    time_to_complete_seconds?: number;
+  }) => {
+    const response = await api.post('/api/analytics/track/funnel', data);
+    return response.data;
+  },
+
+  // Session management
+  startSession: async (data: {
+    user_id?: string;
+    entry_page?: string;
+    device_type?: string;
+    browser?: string;
+    os?: string;
+    country?: string;
+    utm_source?: string;
+    utm_medium?: string;
+    utm_campaign?: string;
+  }) => {
+    const response = await api.post('/api/analytics/session/start', data);
+    return response.data;
+  },
+
+  endSession: async (data: {
+    session_id: string;
+    exit_page?: string;
+  }) => {
+    const response = await api.post('/api/analytics/session/end', data);
+    return response.data;
+  },
+
+  // Dashboard metrics
+  getDashboard: async (userId?: string, days: number = 30) => {
+    const params: Record<string, string | number> = { days };
+    if (userId) params.user_id = userId;
+    const response = await api.get('/api/analytics/dashboard', { params });
+    return response.data;
+  },
+
+  // Realtime metrics
+  getRealtime: async () => {
+    const response = await api.get('/api/analytics/realtime');
+    return response.data;
+  },
+
+  // User analytics
+  getUserAnalytics: async (userId: string) => {
+    const response = await api.get(`/api/analytics/user/${userId}`);
+    return response.data;
+  },
+
+  // Project analytics
+  getProjectAnalytics: async (projectId: string) => {
+    const response = await api.get(`/api/analytics/project/${projectId}`);
+    return response.data;
+  },
+
+  // Framework analytics
+  getFrameworkAnalytics: async (days: number = 30) => {
+    const response = await api.get('/api/analytics/framework', { params: { days } });
+    return response.data;
+  },
+
+  // AI provider analytics
+  getAIProviderAnalytics: async (days: number = 30) => {
+    const response = await api.get('/api/analytics/ai-providers', { params: { days } });
+    return response.data;
+  },
+
+  // Funnel analytics
+  getFunnelAnalytics: async (funnelName: string, days: number = 30) => {
+    const response = await api.get(`/api/analytics/funnel/${funnelName}`, { params: { days } });
+    return response.data;
+  },
+
+  // Export analytics data
+  exportAnalytics: async (startDate: string, endDate: string, metricsType: string = 'all') => {
+    const response = await api.get('/api/analytics/export', {
+      params: { start_date: startDate, end_date: endDate, metrics_type: metricsType }
+    });
+    return response.data;
+  },
+
+  // Aggregate daily metrics (admin)
+  aggregateDailyMetrics: async (date?: string) => {
+    const params = date ? { date } : {};
+    const response = await api.post('/api/analytics/aggregate/daily', null, { params });
+    return response.data;
+  },
+};
+
 export const authAPI = {
   login: async (data: LoginRequest): Promise<AuthResponse> => {
     const response = await api.post<AuthResponse>('/api/auth/login', data);

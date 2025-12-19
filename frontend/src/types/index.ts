@@ -140,3 +140,166 @@ export interface FrameworkSummary {
   key_insights: string[];
   ready_for_development: boolean;
 }
+
+// ==================== Analytics Types ====================
+
+export interface AnalyticsEvent {
+  event_type: string;
+  event_category: string;
+  event_action: string;
+  user_id?: string;
+  session_id?: string;
+  event_label?: string;
+  event_value?: number;
+  properties?: Record<string, unknown>;
+  page_url?: string;
+}
+
+export interface DashboardMetrics {
+  period_days: number;
+  total_sessions: number;
+  avg_session_duration_minutes: number;
+  events_by_category: Record<string, number>;
+  daily_active_users: Array<{ date: string; users: number }>;
+  ai_usage: Record<string, {
+    requests: number;
+    tokens: number;
+    avg_response_time_ms: number;
+    total_cost_usd: number;
+  }>;
+  top_features: Array<{ name: string; usage: number }>;
+}
+
+export interface RealtimeMetrics {
+  active_sessions: number;
+  recent_events: number;
+  active_users: number;
+  timestamp: string;
+}
+
+export interface UserAnalytics {
+  user_id: string;
+  metrics: {
+    first_seen: string | null;
+    last_seen: string | null;
+    total_sessions: number;
+    total_time_spent_minutes: number;
+    engagement_score: number;
+    total_projects: number;
+    active_projects: number;
+    completed_projects: number;
+    frameworks_started: number;
+    frameworks_completed: number;
+    total_chat_messages: number;
+    total_code_generations: number;
+    total_files_generated: number;
+    preferred_tech_stack: string | null;
+    favorite_ai_provider: string | null;
+  };
+  recent_activity: Array<{
+    type: string;
+    category: string;
+    action: string;
+    timestamp: string;
+  }>;
+  projects: Array<{
+    project_id: string;
+    framework_completed: boolean;
+    chat_messages: number;
+    code_generations: number;
+    files_generated: number;
+    last_activity: string | null;
+  }>;
+}
+
+export interface ProjectAnalytics {
+  project_id: string;
+  framework: {
+    started_at: string | null;
+    completed_at: string | null;
+    completion_time_minutes: number | null;
+    steps_completed: number;
+    steps_skipped: number;
+    phase_times: Record<string, number> | null;
+  };
+  chat: {
+    total_messages: number;
+    ai_responses: number;
+    avg_response_time_ms: number | null;
+    tokens_used: number;
+    claude_messages: number;
+    grok_messages: number;
+  };
+  code_generation: {
+    total_generations: number;
+    files_generated: number;
+    lines_generated: number;
+    success_rate: number | null;
+    languages_used: Record<string, number> | null;
+  };
+  engagement: {
+    total_sessions: number;
+    time_spent_minutes: number;
+    last_activity: string | null;
+    exports: number;
+    deployments: number;
+    github_pushes: number;
+  };
+  recent_events: Array<{
+    type: string;
+    category: string;
+    action: string;
+    timestamp: string;
+  }>;
+}
+
+export interface FrameworkAnalytics {
+  period_days: number;
+  total_started: number;
+  total_completed: number;
+  completion_rate: number;
+  avg_completion_time_minutes: number;
+  avg_phase_times: Record<string, number>;
+  steps_completion_distribution: Record<string, number>;
+}
+
+export interface AIProviderAnalytics {
+  period_days: number;
+  providers: Record<string, {
+    total_requests: number;
+    successful_requests: number;
+    failed_requests: number;
+    total_input_tokens: number;
+    total_output_tokens: number;
+    total_cost_usd: number;
+    avg_response_time_ms: number;
+    success_rate: number;
+  }>;
+  daily_trend: Array<{
+    date: string;
+    provider: string;
+    requests: number;
+    tokens: number;
+  }>;
+}
+
+export interface FunnelAnalytics {
+  funnel_name: string;
+  period_days: number;
+  steps: Record<string, {
+    order: number;
+    started: number;
+    completed: number;
+    dropped: number;
+    avg_time_seconds: number;
+    completion_rate: number;
+    conversion_from_previous: number;
+  }>;
+  overall_conversion: number;
+}
+
+export interface SessionInfo {
+  session_id: string;
+  user_id?: string;
+  started_at: string;
+}

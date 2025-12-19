@@ -20,6 +20,7 @@ from routes.project_management import router as pm_router
 from routes.team import router as team_router
 from routes.github import router as github_router
 from routes.integration import router as integration_router
+from routes.analytics import router as analytics_router
 from config import settings, cors_origins
 from models.database import Base, engine
 import os
@@ -64,6 +65,7 @@ app.include_router(pm_router)
 app.include_router(team_router)
 app.include_router(github_router)
 app.include_router(integration_router)
+app.include_router(analytics_router)
 
 
 @app.get("/")
@@ -82,6 +84,7 @@ async def root():
             "team": "/api/team",
             "github": "/api/github",
             "integration": "/api/integration",
+            "analytics": "/api/analytics",
             "docs": "/docs",
             "collaboration": "/ws/collab"
         }
