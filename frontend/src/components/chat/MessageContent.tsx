@@ -1,15 +1,22 @@
 import React from 'react';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Sparkles } from 'lucide-react';
+import { CodeExplanationModal } from './CodeExplanationModal';
 
 interface MessageContentProps {
   content: string;
   isUser: boolean;
 }
 
+interface CodeBlockForExplanation {
+  code: string;
+  language: string;
+}
+
 export const MessageContent: React.FC<MessageContentProps> = ({ content, isUser }) => {
   const [copiedIndex, setCopiedIndex] = React.useState<number | null>(null);
+  const [explanationCode, setExplanationCode] = React.useState<CodeBlockForExplanation | null>(null);
 
   const copyToClipboard = (code: string, index: number) => {
     navigator.clipboard.writeText(code);
@@ -41,33 +48,58 @@ export const MessageContent: React.FC<MessageContentProps> = ({ content, isUser 
       const currentIndex = codeBlockIndex++;
 
       parts.push(
-        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden">
+        <div key={`code-${match.index}`} className="my-3 rounded-lg overflow-hidden group relative">
           <div className="flex items-center justify-between px-4 py-2 bg-gray-800 text-gray-300">
             <span className="text-xs font-mono">{language}</span>
-            <button
-              onClick={() => copyToClipboard(code, currentIndex)}
-              className="p-1 hover:bg-gray-700 rounded transition-colors"
-              title="Copy code"
-            >
-              {copiedIndex === currentIndex ? (
-                <Check className="w-4 h-4 text-green-400" />
-              ) : (
-                <Copy className="w-4 h-4" />
-              )}
-            </button>
+            <div className="flex items-center gap-1">
+              {/* Explain Button */}
+              <button
+                onClick={() => setExplanationCode({ code, language })}
+                className="p-1.5 hover:bg-gray-700 rounded transition-colors flex items-center gap-1 text-xs opacity-60 hover:opacity-100"
+                title="Explain this code"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Explain</span>
+              </button>
+              {/* Copy Button */}
+              <button
+                onClick={() => copyToClipboard(code, currentIndex)}
+                className="p-1.5 hover:bg-gray-700 rounded transition-colors"
+                title="Copy code"
+              >
+                {copiedIndex === currentIndex ? (
+                  <Check className="w-4 h-4 text-green-400" />
+                ) : (
+                  <Copy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
-          <SyntaxHighlighter
-            language={language}
-            style={oneDark}
-            customStyle={{
-              margin: 0,
-              borderRadius: 0,
-              fontSize: '0.875rem',
-            }}
-            showLineNumbers={code.split('\n').length > 5}
+          <div 
+            className="cursor-pointer" 
+            onClick={() => setExplanationCode({ code, language })}
+            title="Click to explain this code"
           >
-            {code}
-          </SyntaxHighlighter>
+            <SyntaxHighlighter
+              language={language}
+              style={oneDark}
+              customStyle={{
+                margin: 0,
+                borderRadius: 0,
+                fontSize: '0.875rem',
+              }}
+              showLineNumbers={code.split('\n').length > 5}
+            >
+              {code}
+            </SyntaxHighlighter>
+          </div>
+          {/* Click hint overlay */}
+          <div className="absolute inset-0 top-10 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-black/30">
+            <span className="px-3 py-1.5 bg-primary text-primary-foreground rounded-lg text-xs font-medium flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5" />
+              Click to explain
+            </span>
+          </div>
         </div>
       );
 
@@ -118,5 +150,18 @@ export const MessageContent: React.FC<MessageContentProps> = ({ content, isUser 
     return parts.length > 0 ? parts : [text];
   };
 
-  return <div className="break-words">{renderContent()}</div>;
+  return (
+    <>
+      <div className="break-words">{renderContent()}</div>
+      
+      {/* Code Explanation Modal */}
+      {explanationCode && (
+        <CodeExplanationModal
+          code={explanationCode.code}
+          language={explanationCode.language}
+          onClose={() => setExplanationCode(null)}
+        />
+      )}
+    </>
+  );
 };

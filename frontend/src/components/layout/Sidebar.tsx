@@ -10,8 +10,10 @@ import {
   Zap,
   Moon,
   Sun,
+  Monitor,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
+import { useTheme } from '../../contexts/ThemeContext';
 import { projectsAPI } from '../../services/api';
 import type { Project, AIProvider } from '../../types';
 import { cn, formatDate, downloadBlob } from '../../lib/utils';
@@ -31,12 +33,7 @@ export const Sidebar: React.FC = () => {
     setMessages,
   } = useStore();
   
-  const [isDark, setIsDark] = React.useState(document.documentElement.classList.contains('dark'));
-  
-  const toggleTheme = () => {
-    document.documentElement.classList.toggle('dark');
-    setIsDark(!isDark);
-  };
+  const { theme, resolvedTheme, setTheme, toggleTheme } = useTheme();
 
   const handleSelectProject = async (project: Project) => {
     setCurrentProject(project);
@@ -110,7 +107,7 @@ export const Sidebar: React.FC = () => {
           className="p-2.5 hover:bg-accent rounded-xl transition-all"
           title="Toggle theme"
         >
-          {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {resolvedTheme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
         </button>
       </div>
     );
@@ -246,14 +243,39 @@ export const Sidebar: React.FC = () => {
           </select>
         </div>
         
-        {/* Theme Toggle */}
-        <button
-          onClick={toggleTheme}
-          className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-secondary/50 hover:bg-secondary rounded-xl text-sm font-medium transition-all"
-        >
-          {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-          {isDark ? 'Light Mode' : 'Dark Mode'}
-        </button>
+        {/* Theme Selector */}
+        <div className="flex items-center gap-1 p-1 bg-secondary/30 rounded-xl">
+          <button
+            onClick={() => setTheme('light')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              theme === 'light' ? 'bg-background shadow-sm' : 'hover:bg-secondary/50'
+            }`}
+            title="Light mode"
+          >
+            <Sun className="w-3.5 h-3.5" />
+            Light
+          </button>
+          <button
+            onClick={() => setTheme('dark')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              theme === 'dark' ? 'bg-background shadow-sm' : 'hover:bg-secondary/50'
+            }`}
+            title="Dark mode"
+          >
+            <Moon className="w-3.5 h-3.5" />
+            Dark
+          </button>
+          <button
+            onClick={() => setTheme('system')}
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+              theme === 'system' ? 'bg-background shadow-sm' : 'hover:bg-secondary/50'
+            }`}
+            title="System preference"
+          >
+            <Monitor className="w-3.5 h-3.5" />
+            Auto
+          </button>
+        </div>
       </div>
     </div>
   );

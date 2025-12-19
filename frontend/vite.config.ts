@@ -19,4 +19,21 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // Chunk splitting for better caching
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Vendor chunks
+          'react-vendor': ['react', 'react-dom'],
+          'monaco': ['@monaco-editor/react', 'monaco-editor'],
+          'ui-vendor': ['lucide-react', 'react-resizable-panels'],
+          'syntax-highlight': ['react-syntax-highlighter'],
+          'yjs': ['yjs', 'y-monaco'],
+        },
+      },
+    },
+    // Increase chunk size warning limit since we have code splitting
+    chunkSizeWarningLimit: 1000,
+  },
 })

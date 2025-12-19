@@ -1,11 +1,16 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Send, Folder, Sparkles } from 'lucide-react';
-import { useStore, useCurrentProjectMessages } from '../../store/useStore';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { Send, Folder } from 'lucide-react';
+import { useStore, useCurrentProjectMessages, useCurrentProjectFiles } from '../../store/useStore';
 import { useAuth } from '../../contexts/AuthContext';
 import type { ChatMessage } from '../../types';
 import { cn, formatDate } from '../../lib/utils';
 import { MessageContent } from './MessageContent';
 import { Suggestions } from './Suggestions';
+import { WelcomeState } from './WelcomeState';
+import { GenerationProgress } from './GenerationProgress';
+import { SmartContextIndicator } from './SmartContextIndicator';
+import { getRelevantFiles, buildContextString } from '../../services/smartContext';
+import { usageTracker } from '../../services/usageTracker';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
@@ -19,16 +24,37 @@ export const ChatPanel: React.FC = () => {
     clearStreamingMessage,
     addMessage,
     aiProvider,
-    projectFiles,
+    projectFiles: allProjectFiles,
     setProjectFiles,
     setShowPreview,
+    generationStage,
+    generationMessage,
+    setGenerationStage,
+    pushFileHistory,
   } = useStore();
 
   const { getToken } = useAuth();
   const messages = useCurrentProjectMessages();
+  const currentProjectFiles = useCurrentProjectFiles();
   const [inputMessage, setInputMessage] = useState('');
+  const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Calculate relevant files based on input message
+  const relevantFiles = useMemo(() => {
+    if (!inputMessage.trim() || currentProjectFiles.length === 0) return [];
+    const files = getRelevantFiles(inputMessage, currentProjectFiles, 5);
+    // Filter out excluded files
+    return files.filter(rf => !excludedFiles.has(rf.file.path));
+  }, [inputMessage, currentProjectFiles, excludedFiles]);
+
+  // Reset excluded files when input changes significantly
+  useEffect(() => {
+    if (inputMessage.length < 3) {
+      setExcludedFiles(new Set());
+    }
+  }, [inputMessage]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -42,6 +68,9 @@ export const ChatPanel: React.FC = () => {
   const sendMessage = async () => {
     if (!inputMessage.trim() || isLoading || !currentProject) return;
 
+    const startTime = Date.now();
+    const originalPrompt = inputMessage;
+
     const userMessage: ChatMessage = {
       role: 'user',
       content: inputMessage,
@@ -52,8 +81,21 @@ export const ChatPanel: React.FC = () => {
     setInputMessage('');
     setIsLoading(true);
     clearStreamingMessage();
+    setGenerationStage('analyzing', 'Understanding your request...');
+    
+    // Save current state to history before changes
+    pushFileHistory(currentProject.id, `Before: ${inputMessage.slice(0, 50)}...`);
 
     try {
+      // Build context from relevant files
+      const contextString = relevantFiles.length > 0 
+        ? buildContextString(relevantFiles)
+        : '';
+      
+      const messageWithContext = contextString 
+        ? `${inputMessage}${contextString}`
+        : inputMessage;
+
       // Use streaming endpoint
       const token = await getToken();
       const response = await fetch(`${API_BASE_URL}/api/chat/stream`, {
@@ -63,7 +105,7 @@ export const ChatPanel: React.FC = () => {
           ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify({
-          message: inputMessage,
+          message: messageWithContext,
           project_id: currentProject.id,
           ai_provider: aiProvider,
           tech_stack: currentProject.tech_stack,
@@ -103,9 +145,16 @@ export const ChatPanel: React.FC = () => {
               if (data.type === 'chunk') {
                 fullResponse += data.content;
                 appendStreamingMessage(data.content);
+                // Update stage based on content
+                if (fullResponse.length < 100) {
+                  setGenerationStage('planning', 'Designing the solution...');
+                } else {
+                  setGenerationStage('generating', 'Writing the code...');
+                }
               } else if (data.type === 'code') {
+                setGenerationStage('generating', `Creating ${data.file_path}...`);
                 // Handle generated code - add to project files
-                const existingFiles = projectFiles[currentProject.id] || [];
+                const existingFiles = allProjectFiles[currentProject.id] || [];
                 const fileExists = existingFiles.some(f => f.path === data.file_path);
                 
                 const newFile = {
@@ -174,7 +223,7 @@ export const ChatPanel: React.FC = () => {
                 }
               } else if (data.type === 'refined_code') {
                 // Handle refined code - update project files
-                const existingFiles = projectFiles[currentProject.id] || [];
+                const existingFiles = allProjectFiles[currentProject.id] || [];
                 const fileExists = existingFiles.some(f => f.path === data.file_path);
                 
                 const newFile = {
@@ -212,6 +261,7 @@ export const ChatPanel: React.FC = () => {
                 };
                 addMessage(currentProject.id, codeMessage);
               } else if (data.type === 'done') {
+                setGenerationStage('complete', 'Generation complete!');
                 // Finalize the response
                 if (fullResponse) {
                   const assistantMessage: ChatMessage = {
@@ -222,7 +272,23 @@ export const ChatPanel: React.FC = () => {
                   addMessage(currentProject.id, assistantMessage);
                 }
                 clearStreamingMessage();
+                // Track usage
+                usageTracker.trackInteraction({
+                  projectId: currentProject.id,
+                  timestamp: Date.now(),
+                  type: 'chat',
+                  provider: aiProvider,
+                  prompt: originalPrompt,
+                  response: fullResponse,
+                  duration: Date.now() - startTime,
+                  success: true,
+                });
+                // Save state after changes
+                pushFileHistory(currentProject.id, `After AI generation`);
+                // Reset stage after a delay
+                setTimeout(() => setGenerationStage('idle'), 2000);
               } else if (data.type === 'error') {
+                setGenerationStage('error', data.error);
                 throw new Error(data.error);
               }
             } catch {
@@ -233,6 +299,7 @@ export const ChatPanel: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to send message:', error);
+      setGenerationStage('error', 'Failed to generate. Please try again.');
       const errorMessage: ChatMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please check your API configuration and try again.',
@@ -240,30 +307,29 @@ export const ChatPanel: React.FC = () => {
       };
       addMessage(currentProject.id, errorMessage);
       clearStreamingMessage();
+      setTimeout(() => setGenerationStage('idle'), 3000);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
 
+  // Auto-resize textarea
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 200) + 'px';
+  };
+
   if (!currentProject) {
     return (
       <div className="flex-1 flex items-center justify-center bg-background">
-        <div className="text-center max-w-md px-4">
-          <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Sparkles className="w-10 h-10 text-primary" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Welcome to Intelekt</h2>
-          <p className="text-muted-foreground mb-6">
-            Create a new project or select an existing one to start building with AI
-          </p>
-        </div>
+        <WelcomeState onPromptSelect={(prompt) => setInputMessage(prompt)} />
       </div>
     );
   }
@@ -284,9 +350,10 @@ export const ChatPanel: React.FC = () => {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.length === 0 && !streamingMessage && (
-          <div className="text-center text-muted-foreground py-8">
-            <p>Start building by describing what you want to create</p>
-          </div>
+          <WelcomeState onPromptSelect={(prompt) => {
+            setInputMessage(prompt);
+            inputRef.current?.focus();
+          }} />
         )}
 
         {messages.map((message, index) => (
@@ -325,8 +392,13 @@ export const ChatPanel: React.FC = () => {
           </div>
         )}
 
-        {/* Loading indicator */}
-        {isLoading && !streamingMessage && (
+        {/* Generation Progress */}
+        {isLoading && generationStage !== 'idle' && (
+          <GenerationProgress stage={generationStage} message={generationMessage} />
+        )}
+
+        {/* Loading indicator (fallback) */}
+        {isLoading && !streamingMessage && generationStage === 'idle' && (
           <div className="flex gap-3 justify-start">
             <div className="bg-card border border-border rounded-lg p-4">
               <div className="flex gap-2">
@@ -353,28 +425,51 @@ export const ChatPanel: React.FC = () => {
         />
       )}
 
+      {/* Smart Context Indicator */}
+      {relevantFiles.length > 0 && (
+        <div className="px-4 pt-3">
+          <SmartContextIndicator
+            relevantFiles={relevantFiles}
+            onRemoveFile={(path) => {
+              setExcludedFiles(prev => new Set([...prev, path]));
+            }}
+          />
+        </div>
+      )}
+
       {/* Input */}
       <div className="p-4 border-t border-border bg-card">
-        <div className="flex gap-2">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Describe what you want to build..."
-            className="flex-1 px-4 py-2 bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-            disabled={isLoading}
-          />
+        <div className="flex gap-2 items-end">
+          <div className="flex-1 relative">
+            <textarea
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => {
+                setInputMessage(e.target.value);
+                adjustTextareaHeight(e.target);
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe what you want to build... (Shift+Enter for new line)"
+              className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary resize-none min-h-[48px] max-h-[200px]"
+              disabled={isLoading}
+              rows={1}
+            />
+            <div className="absolute bottom-2 right-2 text-xs text-muted-foreground pointer-events-none">
+              {inputMessage.length > 0 && `${inputMessage.length} chars`}
+            </div>
+          </div>
           <button
             onClick={sendMessage}
             disabled={isLoading || !inputMessage.trim()}
-            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+            className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 hover:shadow-lg hover:shadow-primary/25"
           >
             <Send className="w-4 h-4" />
-            Send
+            <span className="hidden sm:inline">Send</span>
           </button>
         </div>
+        <p className="text-xs text-muted-foreground mt-2 text-center">
+          Press <kbd className="px-1.5 py-0.5 bg-secondary rounded text-xs font-mono">Enter</kbd> to send, <kbd className="px-1.5 py-0.5 bg-secondary rounded text-xs font-mono">Shift+Enter</kbd> for new line
+        </p>
       </div>
     </div>
   );

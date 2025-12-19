@@ -7,6 +7,24 @@ interface User {
   id: string;
   name: string;
   color: string;
+  avatar?: string;
+}
+
+interface CursorPosition {
+  lineNumber: number;
+  column: number;
+  selection?: {
+    startLineNumber: number;
+    startColumn: number;
+    endLineNumber: number;
+    endColumn: number;
+  };
+}
+
+interface UserPresence extends User {
+  cursor?: CursorPosition;
+  isTyping?: boolean;
+  lastActive: number;
 }
 
 interface CollaborationState {
@@ -14,7 +32,7 @@ interface CollaborationState {
   provider: WebsocketProvider | null;
   awareness: WebsocketProvider['awareness'] | null;
   connected: boolean;
-  users: User[];
+  users: UserPresence[];
 }
 
 // Generate random color for user cursor
@@ -79,12 +97,17 @@ class CollaborationService {
       this.notifyListeners();
     });
 
-    // Track users
+    // Track users with cursor positions
     awareness.on('change', () => {
-      const users: User[] = [];
+      const users: UserPresence[] = [];
       awareness.getStates().forEach((state) => {
         if (state.user) {
-          users.push(state.user as User);
+          users.push({
+            ...state.user as User,
+            cursor: state.cursor as CursorPosition | undefined,
+            isTyping: state.isTyping as boolean | undefined,
+            lastActive: state.lastActive as number || Date.now(),
+          });
         }
       });
       this.state.users = users;
@@ -96,7 +119,7 @@ class CollaborationService {
       provider,
       awareness,
       connected: false,
-      users: [this.currentUser],
+      users: [{ ...this.currentUser, lastActive: Date.now() }],
     };
 
     // Return the shared text type for the file
@@ -140,6 +163,27 @@ class CollaborationService {
     }
   }
 
+  // Update cursor position
+  updateCursor(cursor: CursorPosition): void {
+    if (this.state.awareness) {
+      this.state.awareness.setLocalStateField('cursor', cursor);
+      this.state.awareness.setLocalStateField('lastActive', Date.now());
+    }
+  }
+
+  // Set typing status
+  setTyping(isTyping: boolean): void {
+    if (this.state.awareness) {
+      this.state.awareness.setLocalStateField('isTyping', isTyping);
+      this.state.awareness.setLocalStateField('lastActive', Date.now());
+    }
+  }
+
+  // Get other users (excluding current user)
+  getOtherUsers(): UserPresence[] {
+    return this.state.users.filter(u => u.id !== this.currentUser.id);
+  }
+
   // Subscribe to state changes
   subscribe(listener: (state: CollaborationState) => void): () => void {
     this.listeners.add(listener);
@@ -163,4 +207,4 @@ class CollaborationService {
 }
 
 export const collaborationService = new CollaborationService();
-export type { User, CollaborationState };
+export type { User, UserPresence, CursorPosition, CollaborationState };

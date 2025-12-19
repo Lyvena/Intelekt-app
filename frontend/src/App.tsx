@@ -5,16 +5,23 @@ import { projectsAPI, chatAPI } from './services/api';
 import { Sidebar } from './components/layout/Sidebar';
 import { ChatPanel } from './components/chat/ChatPanel';
 import { FileExplorer } from './components/editor/FileExplorer';
-import { CollaborativeEditor } from './components/editor/CollaborativeEditor';
 import { NewProjectModal } from './components/modals/NewProjectModal';
-import { LivePreview, InlinePreviewPanel } from './components/preview';
-import { TerminalPanel } from './components/terminal/TerminalPanel';
 import { DependenciesPanel } from './components/dependencies/DependenciesPanel';
 import { ExportPanel } from './components/export/ExportPanel';
-import { GitPanel } from './components/git/GitPanel';
-import { Terminal, Package, Download, GitBranch, Eye, EyeOff } from 'lucide-react';
+import { Terminal, Package, Download, GitBranch, Eye, EyeOff, Bug, Coins } from 'lucide-react';
+import { UndoRedoToolbar } from './components/editor/UndoRedoToolbar';
+import { OfflineIndicator } from './components/common/OfflineIndicator';
+import { AIDebugButton, ErrorPanel } from './components/debug';
+import { UsagePanel } from './components/usage';
+import {
+  CollaborativeEditorWithSuspense,
+  LivePreviewWithSuspense,
+  InlinePreviewPanelWithSuspense,
+  TerminalPanelWithSuspense,
+  GitPanelWithSuspense,
+} from './components/LazyComponents';
 
-type BottomPanelType = 'none' | 'terminal' | 'dependencies' | 'export' | 'git';
+type BottomPanelType = 'none' | 'terminal' | 'dependencies' | 'export' | 'git' | 'debug' | 'usage';
 
 function App() {
   const { 
@@ -121,7 +128,7 @@ function App() {
 
                     {/* Code Editor with Collaboration */}
                     <Panel defaultSize={70} minSize={40}>
-                      <CollaborativeEditor />
+                      <CollaborativeEditorWithSuspense />
                     </Panel>
                   </PanelGroup>
                 </Panel>
@@ -131,7 +138,7 @@ function App() {
                   <>
                     <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
                     <Panel defaultSize={25} minSize={20} maxSize={50}>
-                      <InlinePreviewPanel
+                      <InlinePreviewPanelWithSuspense
                         files={previewFiles}
                         onFixError={handleFixErrors}
                         isFixing={isFixingErrors}
@@ -149,10 +156,12 @@ function App() {
                 <PanelResizeHandle className="h-1 bg-border hover:bg-primary/50 transition-colors cursor-row-resize" />
                 <Panel defaultSize={30} minSize={15} maxSize={50}>
                   <div className="h-full border-t border-border">
-                    {bottomPanel === 'terminal' && <TerminalPanel />}
+                    {bottomPanel === 'terminal' && <TerminalPanelWithSuspense />}
                     {bottomPanel === 'dependencies' && <DependenciesPanel />}
                     {bottomPanel === 'export' && <ExportPanel />}
-                    {bottomPanel === 'git' && <GitPanel />}
+                    {bottomPanel === 'git' && <GitPanelWithSuspense />}
+                    {bottomPanel === 'debug' && <ErrorPanel />}
+                    {bottomPanel === 'usage' && <UsagePanel />}
                   </div>
                 </Panel>
               </>
@@ -215,6 +224,30 @@ function App() {
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Export</span>
               </button>
+              <button
+                onClick={() => toggleBottomPanel('debug')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'debug' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="Debug"
+              >
+                <Bug className="w-4 h-4" />
+                <span className="hidden sm:inline">Debug</span>
+              </button>
+              <button
+                onClick={() => toggleBottomPanel('usage')}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  bottomPanel === 'usage' 
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title="AI Usage"
+              >
+                <Coins className="w-4 h-4" />
+                <span className="hidden sm:inline">Usage</span>
+              </button>
             </div>
 
             {/* Preview Toggle */}
@@ -232,9 +265,20 @@ function App() {
                 <span className="hidden sm:inline">Preview</span>
               </button>
             </div>
+
+            {/* AI Debug Button */}
+            <div className="ml-2">
+              <AIDebugButton />
+            </div>
+
+            {/* Undo/Redo */}
+            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 ml-2">
+              <UndoRedoToolbar projectId={currentProject?.id} />
+            </div>
             
             {/* Right side - Status */}
             <div className="ml-auto flex items-center gap-3 text-xs text-muted-foreground">
+              <OfflineIndicator />
               <div className="flex items-center gap-1.5">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 <span>Ready</span>
@@ -249,7 +293,7 @@ function App() {
 
       {/* Live Preview */}
       {showPreview && (
-        <LivePreview
+        <LivePreviewWithSuspense
           files={previewFiles}
           onClose={() => setShowPreview(false)}
           onFixError={handleFixErrors}

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeContext';
 import { UserHeader } from './components/auth/UserHeader';
 import { LoginForm, SignUpForm, ForgotPasswordForm, ResetPasswordForm } from './components/auth';
 import App from './App';
@@ -182,8 +183,10 @@ function AuthenticatedApp() {
 
 export default function AppWithAuth() {
   return (
-    <AuthProvider>
-      <AuthenticatedApp />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AuthenticatedApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

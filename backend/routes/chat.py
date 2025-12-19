@@ -383,6 +383,166 @@ class FixErrorsRequest(BaseModel):
     project_id: Optional[str] = None
 
 
+class ExplainCodeRequest(BaseModel):
+    code: str
+    language: str
+    ai_provider: AIProvider = AIProvider.CLAUDE
+    project_id: Optional[str] = None
+
+
+@router.post("/explain")
+@limiter.limit("20/minute")
+async def explain_code(request: Request, explain_request: ExplainCodeRequest):
+    """
+    Get AI explanation for a code snippet.
+    
+    This endpoint takes code and returns a detailed explanation
+    of what the code does, how it works, and any suggestions.
+    """
+    try:
+        system_prompt = """You are a helpful code explainer. Analyze the provided code and give a clear, 
+concise explanation that includes:
+1. What the code does (high-level overview)
+2. How it works (step-by-step breakdown of key parts)
+3. Any important patterns, techniques, or concepts used
+4. Potential improvements or things to watch out for
+
+Keep the explanation beginner-friendly but technically accurate. Use simple language."""
+
+        messages = [
+            ChatMessage(
+                role="user",
+                content=f"Please explain this {explain_request.language} code:\n\n```{explain_request.language}\n{explain_request.code}\n```",
+                timestamp=datetime.now()
+            )
+        ]
+        
+        explanation = await ai_service.generate_response(
+            messages=messages,
+            provider=explain_request.ai_provider,
+            system_prompt=system_prompt,
+            max_tokens=2000
+        )
+        
+        return {
+            "success": True,
+            "explanation": explanation,
+            "language": explain_request.language
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class AutoDebugRequest(BaseModel):
+    errors: List[Dict[str, Any]]
+    files: Dict[str, str]
+    ai_provider: AIProvider = AIProvider.CLAUDE
+    project_id: Optional[str] = None
+
+
+@router.post("/auto-debug")
+@limiter.limit("15/minute")
+async def auto_debug(request: Request, debug_request: AutoDebugRequest):
+    """
+    AI-powered auto-debugging endpoint.
+    
+    Analyzes errors and generates intelligent fixes with explanations.
+    """
+    try:
+        # Format errors for AI
+        error_descriptions = []
+        for error in debug_request.errors:
+            error_descriptions.append(
+                f"- {error.get('file', 'unknown')}:{error.get('line', 0)} - "
+                f"[{error.get('severity', 'error')}] {error.get('message', '')}"
+            )
+        
+        # Build context from files
+        file_context = "\n\n".join([
+            f"// File: {path}\n{content[:2000]}"  # Limit content size
+            for path, content in list(debug_request.files.items())[:5]  # Limit files
+        ])
+        
+        system_prompt = """You are an expert code debugger and fixer. Analyze the errors and provide fixes.
+
+For each error, provide:
+1. Root cause analysis
+2. The exact fix needed
+3. Prevention tips
+
+Return a JSON response with this structure:
+{
+  "analysis": "Brief overview of issues found",
+  "fixes": [
+    {
+      "error_id": "matching error id or index",
+      "file": "file path",
+      "line": line_number,
+      "old_code": "exact code to replace",
+      "new_code": "corrected code",
+      "explanation": "why this fix works"
+    }
+  ],
+  "suggestions": ["general improvement suggestions"]
+}
+
+Be precise with old_code - it must match exactly what's in the file."""
+
+        messages = [
+            ChatMessage(
+                role="user",
+                content=f"""Debug these errors:
+
+{chr(10).join(error_descriptions)}
+
+Files context:
+{file_context}
+
+Provide fixes in JSON format.""",
+                timestamp=datetime.now()
+            )
+        ]
+        
+        response = await ai_service.generate_response(
+            messages=messages,
+            provider=debug_request.ai_provider,
+            system_prompt=system_prompt,
+            max_tokens=3000
+        )
+        
+        # Try to parse JSON from response
+        import json
+        import re
+        
+        # Extract JSON from response
+        json_match = re.search(r'\{[\s\S]*\}', response)
+        if json_match:
+            try:
+                result = json.loads(json_match.group())
+                return {
+                    "success": True,
+                    "analysis": result.get("analysis", ""),
+                    "fixes": result.get("fixes", []),
+                    "suggestions": result.get("suggestions", []),
+                    "raw_response": response
+                }
+            except json.JSONDecodeError:
+                pass
+        
+        # Fallback if JSON parsing fails
+        return {
+            "success": True,
+            "analysis": response,
+            "fixes": [],
+            "suggestions": [],
+            "raw_response": response
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.post("/fix-errors")
 @limiter.limit("10/minute")
 async def fix_errors(request: Request, fix_request: FixErrorsRequest):
