@@ -7,12 +7,12 @@ import { ChatPanel } from './components/chat/ChatPanel';
 import { FileExplorer } from './components/editor/FileExplorer';
 import { CollaborativeEditor } from './components/editor/CollaborativeEditor';
 import { NewProjectModal } from './components/modals/NewProjectModal';
-import { LivePreview } from './components/preview/LivePreview';
+import { LivePreview, InlinePreviewPanel } from './components/preview';
 import { TerminalPanel } from './components/terminal/TerminalPanel';
 import { DependenciesPanel } from './components/dependencies/DependenciesPanel';
 import { ExportPanel } from './components/export/ExportPanel';
 import { GitPanel } from './components/git/GitPanel';
-import { Terminal, Package, Download, GitBranch } from 'lucide-react';
+import { Terminal, Package, Download, GitBranch, Eye, EyeOff } from 'lucide-react';
 
 type BottomPanelType = 'none' | 'terminal' | 'dependencies' | 'export' | 'git';
 
@@ -30,6 +30,7 @@ function App() {
   const previewFiles = usePreviewFiles();
   const [isFixingErrors, setIsFixingErrors] = useState(false);
   const [bottomPanel, setBottomPanel] = useState<BottomPanelType>('none');
+  const [showInlinePreview, setShowInlinePreview] = useState(true);
 
   const toggleBottomPanel = (panel: BottomPanelType) => {
     setBottomPanel(bottomPanel === panel ? 'none' : panel);
@@ -107,10 +108,10 @@ function App() {
                 <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
 
                 {/* Editor Section */}
-                <Panel defaultSize={60} minSize={30}>
+                <Panel defaultSize={showInlinePreview ? 35 : 60} minSize={25}>
                   <PanelGroup direction="horizontal">
                     {/* File Explorer */}
-                    <Panel defaultSize={25} minSize={15} maxSize={40}>
+                    <Panel defaultSize={30} minSize={15} maxSize={45}>
                       <div className="h-full border-r border-border bg-card">
                         <FileExplorer />
                       </div>
@@ -119,11 +120,26 @@ function App() {
                     <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
 
                     {/* Code Editor with Collaboration */}
-                    <Panel defaultSize={75} minSize={40}>
+                    <Panel defaultSize={70} minSize={40}>
                       <CollaborativeEditor />
                     </Panel>
                   </PanelGroup>
                 </Panel>
+
+                {/* Inline Preview Panel */}
+                {showInlinePreview && (
+                  <>
+                    <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors cursor-col-resize" />
+                    <Panel defaultSize={25} minSize={20} maxSize={50}>
+                      <InlinePreviewPanel
+                        files={previewFiles}
+                        onFixError={handleFixErrors}
+                        isFixing={isFixingErrors}
+                        onOpenFullPreview={() => setShowPreview(true)}
+                      />
+                    </Panel>
+                  </>
+                )}
               </PanelGroup>
             </Panel>
 
@@ -198,6 +214,22 @@ function App() {
               >
                 <Download className="w-4 h-4" />
                 <span className="hidden sm:inline">Export</span>
+              </button>
+            </div>
+
+            {/* Preview Toggle */}
+            <div className="flex items-center gap-1 bg-secondary/50 rounded-lg p-1 ml-2">
+              <button
+                onClick={() => setShowInlinePreview(!showInlinePreview)}
+                className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md transition-all duration-200 ${
+                  showInlinePreview 
+                    ? 'bg-green-600 text-white shadow-md shadow-green-600/25' 
+                    : 'hover:bg-secondary text-muted-foreground hover:text-foreground'
+                }`}
+                title={showInlinePreview ? "Hide Preview" : "Show Preview"}
+              >
+                {showInlinePreview ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                <span className="hidden sm:inline">Preview</span>
               </button>
             </div>
             
