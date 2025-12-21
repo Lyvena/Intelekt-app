@@ -11,6 +11,7 @@ import {
   Moon,
   Sun,
   Monitor,
+  Lightbulb,
 } from 'lucide-react';
 import { useStore } from '../../store/useStore';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -242,6 +243,17 @@ export const Sidebar: React.FC = () => {
             <option value="grok">Grok 2</option>
           </select>
         </div>
+        
+        {/* Feature Request Link */}
+        <a
+          href="https://intelekt.canny.io/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 px-3 py-2.5 bg-secondary/30 hover:bg-secondary/50 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground transition-all group"
+        >
+          <Lightbulb className="w-4 h-4 text-amber-500 group-hover:text-amber-400 transition-colors" />
+          <span>Request a Feature</span>
+        </a>
         
         {/* Theme Selector */}
         <div className="flex items-center gap-1 p-1 bg-secondary/30 rounded-xl">
