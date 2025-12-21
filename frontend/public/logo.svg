@@ -1,6 +1,116 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <rect width="512" height="512" fill="#F5F5F0"/>
-  <path d="M180 160L80 256L180 352" stroke="#3B82A6" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M256 120L256 392" stroke="#3B82A6" stroke-width="40" stroke-linecap="round"/>
-  <path d="M332 160L432 256L332 352" stroke="#3B82A6" stroke-width="40" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0f"/>
+      <stop offset="100%" style="stop-color:#1a1a2e"/>
+    </linearGradient>
+    <linearGradient id="cyanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#00d4ff"/>
+      <stop offset="100%" style="stop-color:#0099cc"/>
+    </linearGradient>
+    <linearGradient id="purpleGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#a855f7"/>
+      <stop offset="100%" style="stop-color:#7c3aed"/>
+    </linearGradient>
+    <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <filter id="glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="512" height="512" fill="url(#bgGrad)"/>
+  
+  <!-- Outer hexagon frame -->
+  <polygon points="256,60 420,155 420,357 256,452 92,357 92,155" 
+           fill="none" stroke="#00d4ff" stroke-width="2" opacity="0.3"/>
+  
+  <!-- Inner hexagon -->
+  <polygon points="256,100 380,175 380,337 256,412 132,337 132,175" 
+           fill="none" stroke="url(#cyanGrad)" stroke-width="3" filter="url(#glow)"/>
+  
+  <!-- Circuit lines from corners -->
+  <g stroke="#00d4ff" stroke-width="2" opacity="0.6">
+    <line x1="92" y1="155" x2="132" y2="175"/>
+    <line x1="420" y1="155" x2="380" y2="175"/>
+    <line x1="92" y1="357" x2="132" y2="337"/>
+    <line x1="420" y1="357" x2="380" y2="337"/>
+    <line x1="256" y1="60" x2="256" y2="100"/>
+    <line x1="256" y1="452" x2="256" y2="412"/>
+  </g>
+  
+  <!-- Code brackets - left -->
+  <path d="M160 200 L120 256 L160 312" 
+        stroke="url(#cyanGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" 
+        fill="none" filter="url(#glowStrong)"/>
+  
+  <!-- Code brackets - right -->
+  <path d="M352 200 L392 256 L352 312" 
+        stroke="url(#cyanGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" 
+        fill="none" filter="url(#glowStrong)"/>
+  
+  <!-- Central AI brain/neural network representation -->
+  <g filter="url(#glow)">
+    <!-- Central core -->
+    <circle cx="256" cy="256" r="24" fill="url(#purpleGrad)"/>
+    <circle cx="256" cy="256" r="32" fill="none" stroke="#a855f7" stroke-width="2" opacity="0.6"/>
+    
+    <!-- Neural nodes -->
+    <circle cx="256" cy="180" r="10" fill="url(#cyanGrad)"/>
+    <circle cx="256" cy="332" r="10" fill="url(#cyanGrad)"/>
+    <circle cx="210" cy="218" r="8" fill="url(#purpleGrad)"/>
+    <circle cx="302" cy="218" r="8" fill="url(#purpleGrad)"/>
+    <circle cx="210" cy="294" r="8" fill="url(#purpleGrad)"/>
+    <circle cx="302" cy="294" r="8" fill="url(#purpleGrad)"/>
+    
+    <!-- Neural connections -->
+    <g stroke="#a855f7" stroke-width="2" opacity="0.8">
+      <line x1="256" y1="190" x2="256" y2="232"/>
+      <line x1="256" y1="280" x2="256" y2="322"/>
+      <line x1="217" y1="222" x2="247" y2="248"/>
+      <line x1="295" y1="222" x2="265" y2="248"/>
+      <line x1="217" y1="290" x2="247" y2="264"/>
+      <line x1="295" y1="290" x2="265" y2="264"/>
+      <line x1="218" y1="218" x2="248" y2="184"/>
+      <line x1="294" y1="218" x2="264" y2="184"/>
+      <line x1="218" y1="294" x2="248" y2="328"/>
+      <line x1="294" y1="294" x2="264" y2="328"/>
+    </g>
+  </g>
+  
+  <!-- Data flow particles -->
+  <g fill="#00d4ff" opacity="0.8">
+    <circle cx="140" cy="228" r="3"/>
+    <circle cx="140" cy="284" r="3"/>
+    <circle cx="372" cy="228" r="3"/>
+    <circle cx="372" cy="284" r="3"/>
+  </g>
+  
+  <!-- Binary decoration -->
+  <g fill="#00d4ff" opacity="0.3" font-family="monospace" font-size="10">
+    <circle cx="108" cy="200" r="2"/>
+    <circle cx="108" cy="312" r="2"/>
+    <circle cx="404" cy="200" r="2"/>
+    <circle cx="404" cy="312" r="2"/>
+  </g>
+  
+  <!-- Corner accent nodes -->
+  <g fill="#00d4ff">
+    <circle cx="256" cy="60" r="5" opacity="0.8"/>
+    <circle cx="256" cy="452" r="5" opacity="0.8"/>
+    <circle cx="92" cy="155" r="4" opacity="0.6"/>
+    <circle cx="420" cy="155" r="4" opacity="0.6"/>
+    <circle cx="92" cy="357" r="4" opacity="0.6"/>
+    <circle cx="420" cy="357" r="4" opacity="0.6"/>
+  </g>
 </svg>
