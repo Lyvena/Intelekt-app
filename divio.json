@@ -6,7 +6,7 @@
   "services": {
     "web": {
       "build_command": "pip install -r backend/requirements.txt && pip install 'numpy<2.0'",
-      "command": "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT",
+      "command": "uvicorn main:app --host 0.0.0.0 --port $PORT",
       "port": 8000
     }
   },
