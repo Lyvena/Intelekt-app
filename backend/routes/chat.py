@@ -4,7 +4,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
 from models.database import get_db
 from models.database.user import User
@@ -14,9 +14,11 @@ from services.codebase_indexer import codebase_indexer
 from utils.auth import get_current_user
 from datetime import datetime
 import json
+import logging
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 limiter = Limiter(key_func=get_remote_address)
+logger = logging.getLogger("intelekt.chat")
 
 
 @router.post("", response_model=ChatResponse)
@@ -35,6 +37,11 @@ async def chat(
     Rate limited to 30 requests per minute.
     """
     try:
+        logger.info("chat request start", extra={
+            "user_id": getattr(current_user, "id", None),
+            "project_id": chat_request.project_id,
+            "provider": getattr(chat_request.ai_provider, "value", None)
+        })
         # Check usage limits before processing
         usage_service.enforce_generation_limit(db, current_user)
         
@@ -91,7 +98,7 @@ async def chat(
                 file_path = result["file_path"]
             except Exception as e:
                 # If code generation fails, continue with text response
-                print(f"Code generation failed: {e}")
+                logger.exception("Code generation failed in chat()")
         
         # Generate suggestions
         suggestions = _generate_suggestions(chat_request.message, chat_request.tech_stack)
@@ -110,6 +117,7 @@ async def chat(
     except HTTPException:
         raise
     except Exception as e:
+        logger.exception("Unhandled error in chat()")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -128,11 +136,31 @@ async def chat_stream(
     Rate limited to 30 requests per minute.
     """
     # Check usage limits before processing (outside generator to return proper HTTP errors)
-    usage_service.enforce_generation_limit(db, current_user)
-    usage_service.enforce_ai_provider_access(current_user, chat_request.ai_provider.value)
+    logger.info("chat_stream request start", extra={
+        "user_id": getattr(current_user, "id", None),
+        "project_id": chat_request.project_id,
+        "provider": getattr(chat_request.ai_provider, "value", None)
+    })
+
+    try:
+        usage_service.enforce_generation_limit(db, current_user)
+    except HTTPException as he:
+        logger.warning("generation limit enforcement failed", exc_info=he)
+        raise
+
+    try:
+        usage_service.enforce_ai_provider_access(current_user, chat_request.ai_provider.value)
+    except HTTPException as he:
+        logger.warning("ai provider access enforcement failed", exc_info=he)
+        raise
     
     async def generate():
         try:
+            logger.info("stream generator started", extra={
+                "user_id": getattr(current_user, "id", None),
+                "project_id": chat_request.project_id,
+                "provider": getattr(chat_request.ai_provider, "value", None)
+            })
             # Increment usage at start of stream
             usage_service.increment_usage(db, current_user)
             
@@ -167,7 +195,7 @@ async def chat_stream(
                         list(existing_files.keys())
                     )
                 except Exception:
-                    pass
+                    logger.exception("Failed to get project files for context")
                 
                 # Build COMPREHENSIVE AI context using codebase indexer
                 # This gives the AI full understanding of the entire project
@@ -196,6 +224,15 @@ async def chat_stream(
                 existing_files=existing_files if len(existing_files) < 10 else None,
                 max_tokens=4096
             ):
+                try:
+                    logger.debug("stream chunk received", extra={
+                        "user_id": getattr(current_user, "id", None),
+                        "project_id": chat_request.project_id,
+                        "chunk_preview": (chunk[:200] + '...') if len(chunk) > 200 else chunk
+                    })
+                except Exception:
+                    logger.debug("stream chunk received (no extras)")
+
                 full_response += chunk
                 yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
             
@@ -270,7 +307,7 @@ async def chat_stream(
                             yield f"data: {json.dumps({'type': 'refined_code', 'code': file_info['content'], 'file_path': file_info['path'], 'is_new': file_info.get('is_new', False)})}\n\n"
                 
                 except Exception as e:
-                    print(f"Refinement failed: {e}")
+                    logger.exception("Refinement failed")
                     yield f"data: {json.dumps({'type': 'error', 'error': f'Refinement failed: {str(e)}'})}\n\n"
             
             elif should_generate:
@@ -299,16 +336,18 @@ async def chat_stream(
                         )
                         yield f"data: {json.dumps({'type': 'code', 'code': result['code'], 'file_path': result['file_path']})}\n\n"
                 except Exception as e:
-                    print(f"Code generation failed: {e}")
+                    logger.exception("Code generation failed")
             
             # Send suggestions
             suggestions = _generate_suggestions(chat_request.message, chat_request.tech_stack)
+            logger.debug("sending suggestions", extra={"project_id": chat_request.project_id, "suggestions": suggestions})
             yield f"data: {json.dumps({'type': 'suggestions', 'suggestions': suggestions})}\n\n"
             
             # Signal completion
             yield f"data: {json.dumps({'type': 'done'})}\n\n"
             
         except Exception as e:
+            logger.exception("Unhandled exception in stream generator")
             yield f"data: {json.dumps({'type': 'error', 'error': str(e)})}\n\n"
     
     return StreamingResponse(

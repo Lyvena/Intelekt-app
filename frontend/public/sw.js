@@ -1,7 +1,8 @@
 // Service Worker for Intelekt - Offline Support
-const CACHE_NAME = 'intelekt-cache-v1';
-const STATIC_CACHE = 'intelekt-static-v1';
-const PROJECT_CACHE = 'intelekt-projects-v1';
+// NOTE: bump cache versions when changing caching strategy so clients update
+const CACHE_NAME = 'intelekt-cache-v2';
+const STATIC_CACHE = 'intelekt-static-v2';
+const PROJECT_CACHE = 'intelekt-projects-v2';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -66,13 +67,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For app routes, serve index.html from cache
-  if (!url.pathname.includes('.')) {
-    event.respondWith(
-      caches.match('/index.html').then((response) => {
-        return response || fetch(request);
-      })
-    );
+  // For app routes (SPA navigation), use network-first so index.html is fresh
+  if (!url.pathname.includes('.') && request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const networkResponse = await fetch(request);
+        // update cached index.html so offline fallback is newer
+        if (networkResponse && networkResponse.ok) {
+          const cache = await caches.open(STATIC_CACHE);
+          cache.put('/index.html', networkResponse.clone());
+        }
+        return networkResponse;
+      } catch (error) {
+        // network failed — try cache
+        const cached = await caches.match('/index.html');
+        if (cached) return cached;
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      }
+    })());
     return;
   }
 
@@ -134,7 +146,7 @@ self.addEventListener('message', (event) => {
     const { projectId, files } = event.data;
     cacheProjectFiles(projectId, files);
   }
-  
+
   if (event.data && event.data.type === 'CLEAR_PROJECT_CACHE') {
     const { projectId } = event.data;
     clearProjectCache(projectId);
@@ -149,11 +161,11 @@ self.addEventListener('message', (event) => {
 async function cacheProjectFiles(projectId, files) {
   const cache = await caches.open(PROJECT_CACHE);
   const cacheKey = `/offline/projects/${projectId}/files`;
-  
+
   const response = new Response(JSON.stringify({ projectId, files, timestamp: Date.now() }), {
     headers: { 'Content-Type': 'application/json' }
   });
-  
+
   await cache.put(cacheKey, response);
   console.log('[SW] Cached project files:', projectId);
 }
@@ -162,7 +174,7 @@ async function cacheProjectFiles(projectId, files) {
 async function clearProjectCache(projectId) {
   const cache = await caches.open(PROJECT_CACHE);
   const keys = await cache.keys();
-  
+
   for (const key of keys) {
     if (key.url.includes(`/projects/${projectId}`)) {
       await cache.delete(key);

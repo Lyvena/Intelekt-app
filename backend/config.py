@@ -1,4 +1,5 @@
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 from typing import Optional, List
 import os
 
@@ -62,10 +63,15 @@ class Settings(BaseSettings):
     
     # Frontend URL for email links
     frontend_url: str = "http://localhost:5173"
+    # Accept some environment-only keys that are used by deployments
+    cors_origins: Optional[str] = None
+    resend_from_live: Optional[str] = None
     
     class Config:
-        env_file = ".env"
-        case_sensitive = False
+        pass
+
+# Use Pydantic v2 style model_config to allow extra environment variables
+Settings.model_config = ConfigDict(env_file=".env", case_sensitive=False, extra="ignore")
 
 
 settings = Settings()

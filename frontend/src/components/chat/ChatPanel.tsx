@@ -82,17 +82,17 @@ export const ChatPanel: React.FC = () => {
     setIsLoading(true);
     clearStreamingMessage();
     setGenerationStage('analyzing', 'Understanding your request...');
-    
+
     // Save current state to history before changes
     pushFileHistory(currentProject.id, `Before: ${inputMessage.slice(0, 50)}...`);
 
     try {
       // Build context from relevant files
-      const contextString = relevantFiles.length > 0 
+      const contextString = relevantFiles.length > 0
         ? buildContextString(relevantFiles)
         : '';
-      
-      const messageWithContext = contextString 
+
+      const messageWithContext = contextString
         ? `${inputMessage}${contextString}`
         : inputMessage;
 
@@ -114,6 +114,8 @@ export const ChatPanel: React.FC = () => {
       });
 
       if (!response.ok) {
+        const bodyText = await response.text();
+        console.error('Chat stream request failed', response.status, bodyText);
         throw new Error('Failed to send message');
       }
 
@@ -135,12 +137,14 @@ export const ChatPanel: React.FC = () => {
         }
 
         const chunk = decoder.decode(value);
+        console.debug('Received raw chunk:', chunk);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              console.debug('Parsed SSE event:', data);
 
               if (data.type === 'chunk') {
                 fullResponse += data.content;
@@ -156,12 +160,12 @@ export const ChatPanel: React.FC = () => {
                 // Handle generated code - add to project files
                 const existingFiles = allProjectFiles[currentProject.id] || [];
                 const fileExists = existingFiles.some(f => f.path === data.file_path);
-                
+
                 const newFile = {
                   path: data.file_path,
                   content: data.code,
                 };
-                
+
                 if (fileExists) {
                   setProjectFiles(
                     currentProject.id,
@@ -170,12 +174,12 @@ export const ChatPanel: React.FC = () => {
                 } else {
                   setProjectFiles(currentProject.id, [...existingFiles, newFile]);
                 }
-                
+
                 // Show preview automatically for HTML/JS/CSS files
                 if (data.file_path.endsWith('.html') || data.file_path.endsWith('.js') || data.file_path.endsWith('.css')) {
                   setShowPreview(true);
                 }
-                
+
                 // Get file extension for syntax highlighting
                 const ext = data.file_path.split('.').pop() || 'txt';
                 const langMap: Record<string, string> = {
@@ -183,7 +187,7 @@ export const ChatPanel: React.FC = () => {
                   'py': 'python', 'json': 'json', 'jsx': 'jsx', 'tsx': 'tsx'
                 };
                 const lang = langMap[ext] || ext;
-                
+
                 const codeMessage: ChatMessage = {
                   role: 'assistant',
                   content: `📄 Generated: \`${data.file_path}\`\n\n\`\`\`${lang}\n${data.code}\n\`\`\``,
@@ -192,7 +196,7 @@ export const ChatPanel: React.FC = () => {
                 addMessage(currentProject.id, codeMessage);
               } else if (data.type === 'project_info') {
                 // Handle project generation summary
-                const deps = data.dependencies?.length > 0 
+                const deps = data.dependencies?.length > 0
                   ? `\n\n**Dependencies:** ${data.dependencies.join(', ')}`
                   : '';
                 const summaryMessage: ChatMessage = {
@@ -225,12 +229,12 @@ export const ChatPanel: React.FC = () => {
                 // Handle refined code - update project files
                 const existingFiles = allProjectFiles[currentProject.id] || [];
                 const fileExists = existingFiles.some(f => f.path === data.file_path);
-                
+
                 const newFile = {
                   path: data.file_path,
                   content: data.code,
                 };
-                
+
                 if (fileExists) {
                   setProjectFiles(
                     currentProject.id,
@@ -239,12 +243,12 @@ export const ChatPanel: React.FC = () => {
                 } else {
                   setProjectFiles(currentProject.id, [...existingFiles, newFile]);
                 }
-                
+
                 // Show preview automatically
                 if (data.file_path.endsWith('.html') || data.file_path.endsWith('.js') || data.file_path.endsWith('.css')) {
                   setShowPreview(true);
                 }
-                
+
                 // Get file extension for syntax highlighting
                 const ext = data.file_path.split('.').pop() || 'txt';
                 const langMap: Record<string, string> = {
@@ -252,7 +256,7 @@ export const ChatPanel: React.FC = () => {
                   'py': 'python', 'json': 'json', 'jsx': 'jsx', 'tsx': 'tsx'
                 };
                 const lang = langMap[ext] || ext;
-                
+
                 const actionLabel = data.is_new ? '📄 Added' : '🔄 Modified';
                 const codeMessage: ChatMessage = {
                   role: 'assistant',
@@ -264,6 +268,7 @@ export const ChatPanel: React.FC = () => {
                 setGenerationStage('complete', 'Generation complete!');
                 // Finalize the response
                 if (fullResponse) {
+                  console.debug('Final assembled response:', fullResponse);
                   const assistantMessage: ChatMessage = {
                     role: 'assistant',
                     content: fullResponse,

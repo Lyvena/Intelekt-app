@@ -8,9 +8,13 @@ from passlib.context import CryptContext
 from itsdangerous import URLSafeTimedSerializer
 from models.database import get_db, User
 from config import settings
+import logging
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+logger = logging.getLogger("intelekt.auth")
+
+# Password hashing - prefer Argon2, fall back to bcrypt
+# Argon2 avoids bcrypt's 72-byte password limit and is more secure by default.
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 # JWT Configuration
 SECRET_KEY = settings.secret_key
@@ -49,6 +53,7 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 def verify_token(token: str) -> dict:
     """Verify a JWT token and return the payload."""
     try:
+        logger.debug("Verifying token", extra={"token_preview": token[:10] + '...' if token else None})
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
@@ -58,6 +63,17 @@ def verify_token(token: str) -> dict:
             headers={"WWW-Authenticate": "Bearer"},
         )
     except jwt.InvalidTokenError:
+        # Attempt to log unverified header/payload for debugging (do not log the full token)
+        try:
+            unverified_header = jwt.get_unverified_header(token)
+            unverified_payload = jwt.decode(token, options={"verify_signature": False})
+            logger.warning("Invalid token provided", extra={
+                "alg": unverified_header.get("alg"),
+                "token_sub": unverified_payload.get("sub"),
+                "token_exp": unverified_payload.get("exp")
+            })
+        except Exception:
+            logger.warning("Invalid token provided (could not decode unverified header/payload)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials",
@@ -99,13 +115,15 @@ async def get_current_user(
 ) -> User:
     """Get the current authenticated user from JWT token."""
     token = credentials.credentials
-    
+    logger.debug("get_current_user called", extra={"has_token": bool(token)})
+
     # Verify token
     payload = verify_token(token)
     
     # Get user ID from token
     user_id = payload.get("sub")
     if not user_id:
+        logger.warning("Token payload missing 'sub' claim", extra={"payload": payload})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid token payload"
@@ -115,6 +133,7 @@ async def get_current_user(
     user = db.query(User).filter(User.id == user_id).first()
     
     if not user:
+        logger.warning("User id from token not found in DB", extra={"user_id": user_id})
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="User not found"

@@ -1,7 +1,8 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -40,14 +41,54 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+class HeadToGetMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method == "HEAD":
+            # Treat HEAD like GET for routing, but return an empty body per spec
+            request.scope["method"] = "GET"
+            res = await call_next(request)
+            headers = dict(res.headers)
+            headers.pop("content-length", None)
+            headers.pop("transfer-encoding", None)
+            return Response(status_code=res.status_code, headers=headers)
+        return await call_next(request)
+
+# Ensure HEAD probes are handled even if upstream sends HEAD instead of GET
+app.add_middleware(HeadToGetMiddleware)
+
+
+# Early HTTP middleware to ensure HEAD is normalized before other middleware
+@app.middleware("http")
+async def head_to_get_http_middleware(request: Request, call_next):
+    if request.method == "HEAD":
+        request.scope["method"] = "GET"
+        res = await call_next(request)
+        headers = dict(res.headers)
+        headers.pop("content-length", None)
+        headers.pop("transfer-encoding", None)
+        return Response(status_code=res.status_code, headers=headers)
+    return await call_next(request)
+
 # Configure CORS
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=cors_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# If `CORS_ORIGINS` is set to "*" we enable a regex allow-all so
+# browsers can still send credentials if needed during local testing.
+if len(cors_origins) == 1 and cors_origins[0] == "*":
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=".*",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # Include routers
 app.include_router(auth_router)
@@ -91,6 +132,12 @@ async def root():
             "collaboration": "/ws/collab"
         }
     }
+
+
+@app.head("/")
+async def root_head():
+    """Explicit HEAD handler to satisfy probes that send HEAD requests."""
+    return Response(status_code=200)
 
 
 @app.get("/health")
