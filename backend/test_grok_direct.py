@@ -4,9 +4,10 @@ Direct test of Grok API to diagnose connection issues
 """
 import asyncio
 import httpx
+import pytest
 from config import settings
 
-async def test_grok_direct():
+async def _run_grok_direct():
     """Test Grok API with direct HTTP request"""
     
     print("🧪 Direct Grok API Test")
@@ -83,5 +84,13 @@ async def test_grok_direct():
     
     return False
 
+
+def test_grok_direct():
+    """Pytest wrapper that runs the async direct Grok test."""
+    if not settings.xai_api_key or settings.xai_api_key == "your_xai_api_key_here":
+        pytest.skip("XAI_API_KEY not configured; skipping direct Grok test.")
+    assert asyncio.run(_run_grok_direct())
+
+
 if __name__ == "__main__":
-    asyncio.run(test_grok_direct())
+    asyncio.run(_run_grok_direct())

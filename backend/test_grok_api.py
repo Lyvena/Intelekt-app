@@ -4,13 +4,17 @@ Test script to verify Grok API connection
 """
 import asyncio
 import sys
+
+import pytest
+
 from config import settings
 from services.ai_service import ai_service
 from models.schemas import ChatMessage, AIProvider
 
-async def test_grok_api():
-    """Test Grok API connection and response"""
-    
+
+async def _run_grok_api():
+    """Run the Grok API connectivity check."""
+
     print("🧪 Testing Grok API Connection")
     print("=" * 50)
     print()
@@ -67,9 +71,10 @@ async def test_grok_api():
         print()
         return False
 
-async def test_code_generation():
-    """Test code generation with Grok"""
-    
+
+async def _run_code_generation():
+    """Run Grok code-generation check."""
+
     print()
     print("🧪 Testing Code Generation with Grok")
     print("=" * 50)
@@ -105,19 +110,34 @@ async def test_code_generation():
         print(f"❌ Code generation failed: {str(e)}")
         return False
 
+
+def test_grok_api():
+    """Pytest entrypoint that runs the async Grok connectivity check."""
+    if not settings.xai_api_key or settings.xai_api_key == "your_xai_api_key_here":
+        pytest.skip("XAI_API_KEY not configured; skipping live Grok test.")
+    assert asyncio.run(_run_grok_api())
+
+
+def test_code_generation():
+    """Pytest entrypoint that runs the async code generation check."""
+    if not settings.xai_api_key or settings.xai_api_key == "your_xai_api_key_here":
+        pytest.skip("XAI_API_KEY not configured; skipping live Grok code generation test.")
+    assert asyncio.run(_run_code_generation())
+
+
 async def main():
-    """Run all tests"""
+    """Run all tests manually."""
     print()
     print("🚀 Intelekt - Grok API Test Suite")
     print("=" * 50)
     print()
     
     # Test 1: Basic API connection
-    test1_passed = await test_grok_api()
+    test1_passed = await _run_grok_api()
     
     if test1_passed:
         # Test 2: Code generation
-        test2_passed = await test_code_generation()
+        test2_passed = await _run_code_generation()
         
         print()
         print("=" * 50)
