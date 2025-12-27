@@ -1,7 +1,8 @@
 // Service Worker for Intelekt - Offline Support
-const CACHE_NAME = 'intelekt-cache-v1';
-const STATIC_CACHE = 'intelekt-static-v1';
-const PROJECT_CACHE = 'intelekt-projects-v1';
+// NOTE: bump cache versions when changing caching strategy so clients update
+const CACHE_NAME = 'intelekt-cache-v2';
+const STATIC_CACHE = 'intelekt-static-v2';
+const PROJECT_CACHE = 'intelekt-projects-v2';
 
 // Static assets to cache on install
 const STATIC_ASSETS = [
@@ -66,13 +67,24 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // For app routes, serve index.html from cache
-  if (!url.pathname.includes('.')) {
-    event.respondWith(
-      caches.match('/index.html').then((response) => {
-        return response || fetch(request);
-      })
-    );
+  // For app routes (SPA navigation), use network-first so index.html is fresh
+  if (!url.pathname.includes('.') && request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        const networkResponse = await fetch(request);
+        // update cached index.html so offline fallback is newer
+        if (networkResponse && networkResponse.ok) {
+          const cache = await caches.open(STATIC_CACHE);
+          cache.put('/index.html', networkResponse.clone());
+        }
+        return networkResponse;
+      } catch (error) {
+        // network failed — try cache
+        const cached = await caches.match('/index.html');
+        if (cached) return cached;
+        return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+      }
+    })());
     return;
   }
 
