@@ -114,6 +114,8 @@ export const ChatPanel: React.FC = () => {
       });
 
       if (!response.ok) {
+        const bodyText = await response.text();
+        console.error('Chat stream request failed', response.status, bodyText);
         throw new Error('Failed to send message');
       }
 
@@ -135,12 +137,14 @@ export const ChatPanel: React.FC = () => {
         }
 
         const chunk = decoder.decode(value);
+        console.debug('Received raw chunk:', chunk);
         const lines = chunk.split('\n');
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
               const data = JSON.parse(line.slice(6));
+              console.debug('Parsed SSE event:', data);
 
               if (data.type === 'chunk') {
                 fullResponse += data.content;
@@ -264,6 +268,7 @@ export const ChatPanel: React.FC = () => {
                 setGenerationStage('complete', 'Generation complete!');
                 // Finalize the response
                 if (fullResponse) {
+                  console.debug('Final assembled response:', fullResponse);
                   const assistantMessage: ChatMessage = {
                     role: 'assistant',
                     content: fullResponse,
