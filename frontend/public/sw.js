@@ -146,7 +146,7 @@ self.addEventListener('message', (event) => {
     const { projectId, files } = event.data;
     cacheProjectFiles(projectId, files);
   }
-  
+
   if (event.data && event.data.type === 'CLEAR_PROJECT_CACHE') {
     const { projectId } = event.data;
     clearProjectCache(projectId);
@@ -161,11 +161,11 @@ self.addEventListener('message', (event) => {
 async function cacheProjectFiles(projectId, files) {
   const cache = await caches.open(PROJECT_CACHE);
   const cacheKey = `/offline/projects/${projectId}/files`;
-  
+
   const response = new Response(JSON.stringify({ projectId, files, timestamp: Date.now() }), {
     headers: { 'Content-Type': 'application/json' }
   });
-  
+
   await cache.put(cacheKey, response);
   console.log('[SW] Cached project files:', projectId);
 }
@@ -174,7 +174,7 @@ async function cacheProjectFiles(projectId, files) {
 async function clearProjectCache(projectId) {
   const cache = await caches.open(PROJECT_CACHE);
   const keys = await cache.keys();
-  
+
   for (const key of keys) {
     if (key.url.includes(`/projects/${projectId}`)) {
       await cache.delete(key);

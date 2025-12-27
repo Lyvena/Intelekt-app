@@ -9,8 +9,9 @@ from itsdangerous import URLSafeTimedSerializer
 from models.database import get_db, User
 from config import settings
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing - prefer Argon2, fall back to bcrypt
+# Argon2 avoids bcrypt's 72-byte password limit and is more secure by default.
+pwd_context = CryptContext(schemes=["argon2", "bcrypt"], deprecated="auto")
 
 # JWT Configuration
 SECRET_KEY = settings.secret_key

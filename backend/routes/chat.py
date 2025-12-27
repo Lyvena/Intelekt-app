@@ -4,7 +4,7 @@ from slowapi import Limiter
 from slowapi.util import get_remote_address
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from models.schemas import ChatRequest, ChatResponse, ChatMessage, AIProvider
 from models.database import get_db
 from models.database.user import User
