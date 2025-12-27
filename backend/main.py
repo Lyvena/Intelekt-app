@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, Response
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -39,6 +40,35 @@ app = FastAPI(
 # Add rate limiter to app state
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+class HeadToGetMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.method == "HEAD":
+            # Treat HEAD like GET for routing, but return an empty body per spec
+            request.scope["method"] = "GET"
+            res = await call_next(request)
+            headers = dict(res.headers)
+            headers.pop("content-length", None)
+            headers.pop("transfer-encoding", None)
+            return Response(status_code=res.status_code, headers=headers)
+        return await call_next(request)
+
+# Ensure HEAD probes are handled even if upstream sends HEAD instead of GET
+app.add_middleware(HeadToGetMiddleware)
+
+
+# Early HTTP middleware to ensure HEAD is normalized before other middleware
+@app.middleware("http")
+async def head_to_get_http_middleware(request: Request, call_next):
+    if request.method == "HEAD":
+        request.scope["method"] = "GET"
+        res = await call_next(request)
+        headers = dict(res.headers)
+        headers.pop("content-length", None)
+        headers.pop("transfer-encoding", None)
+        return Response(status_code=res.status_code, headers=headers)
+    return await call_next(request)
 
 # Configure CORS
 # If `CORS_ORIGINS` is set to "*" we enable a regex allow-all so
