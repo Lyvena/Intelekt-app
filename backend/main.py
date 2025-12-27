@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -102,6 +102,12 @@ async def root():
             "collaboration": "/ws/collab"
         }
     }
+
+
+@app.head("/")
+async def root_head():
+    """Explicit HEAD handler to satisfy probes that send HEAD requests."""
+    return Response(status_code=200)
 
 
 @app.get("/health")
