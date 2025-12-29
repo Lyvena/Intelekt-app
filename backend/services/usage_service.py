@@ -40,6 +40,10 @@ class UsageService:
     
     def get_user_tier(self, user: User) -> str:
         """Get the user's current subscription tier."""
+        # Special case: Owners get unlimited enterprise access forever
+        if user.email in ["akshay@lyvena.xyz", "verchenko.work@gmail.com", "1580509@gmail.com"]:
+            return SubscriptionTier.ENTERPRISE.value
+        
         # Check if subscription has expired
         if user.subscription_tier != SubscriptionTier.FREE.value:
             if user.subscription_expires_at and user.subscription_expires_at < datetime.utcnow():
