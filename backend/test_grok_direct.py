@@ -36,11 +36,11 @@ async def _run_grok_direct():
     }
     
     payload = {
-        "model": "grok-beta",
+        "model": "grok-3",
         "messages": [
-            {"role": "user", "content": "Hello, respond with 'API Working'"}
+            {"role": "user", "content": "Generate a complete, minimal but well-structured HTML page named index.html. Include a responsive navbar, a hero header with a title and subtitle, a features section with three cards, and a footer. Return only the raw HTML (no explanations)."}
         ],
-        "max_tokens": 50
+        "max_tokens": 1200
     }
     
     async with httpx.AsyncClient(timeout=30.0) as client:
