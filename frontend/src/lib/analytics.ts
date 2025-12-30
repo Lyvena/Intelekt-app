@@ -7,11 +7,11 @@
 
 // Segment Analytics type definitions
 interface AnalyticsJS {
-  identify(userId: string, traits?: Record<string, any>): void;
-  track(event: string, properties?: Record<string, any>): void;
-  page(name?: string, properties?: Record<string, any>): void;
+  identify(userId: string, traits?: Record<string, unknown>): void;
+  track(event: string, properties?: Record<string, unknown>): void;
+  page(name?: string, properties?: Record<string, unknown>): void;
   reset(): void;
-  group(groupId: string, traits?: Record<string, any>): void;
+  group(groupId: string, traits?: Record<string, unknown>): void;
 }
 
 // Extend Window interface to include analytics

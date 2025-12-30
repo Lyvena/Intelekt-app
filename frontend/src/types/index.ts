@@ -303,3 +303,22 @@ export interface SessionInfo {
   user_id?: string;
   started_at: string;
 }
+
+export interface ProductAnalytics {
+  window_days: number;
+  framework: {
+    ready_count: number;
+    avg_time_to_ready_sec: number | null;
+    first_export_count: number;
+    avg_time_to_first_export_sec: number | null;
+    step_completions: number;
+    export_count: number;
+  };
+  preview: {
+    starts: number;
+    success: number;
+    errors: number;
+    success_rate: number | null;
+    avg_duration_sec: number | null;
+  };
+}

@@ -19,8 +19,15 @@ export function ForgotPasswordForm({ onBack }: ForgotPasswordFormProps) {
         try {
             await authAPI.forgotPassword(email);
             setSubmitted(true);
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Failed to send reset email');
+        } catch (err: unknown) {
+            const maybeDetail =
+                typeof err === 'object' &&
+                err !== null &&
+                'response' in err &&
+                typeof (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+                    ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    : null;
+            setError(maybeDetail || 'Failed to send reset email');
         } finally {
             setLoading(false);
         }

@@ -11,8 +11,9 @@ import {
   Unlock,
   FileCode,
   FileText,
+  Link2,
 } from 'lucide-react';
-import { exportAPI } from '../../services/api';
+import { exportAPI, shareAPI } from '../../services/api';
 import { useStore } from '../../store/useStore';
 import { cn } from '../../lib/utils';
 
@@ -31,8 +32,15 @@ export const ExportPanel: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [validating, setValidating] = useState(false);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [presetLoading, setPresetLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [sharingFramework, setSharingFramework] = useState(false);
+  const [sharingSnippet, setSharingSnippet] = useState(false);
+  const [snippetPath, setSnippetPath] = useState('');
   
   // GitHub export form
   const [showGitHubForm, setShowGitHubForm] = useState(false);
@@ -41,6 +49,7 @@ export const ExportPanel: React.FC = () => {
   const [isPrivate, setIsPrivate] = useState(false);
   const [githubToken, setGithubToken] = useState('');
   const [repoUrl, setRepoUrl] = useState<string | null>(null);
+  const [includeDockerPreset, setIncludeDockerPreset] = useState(true);
 
   const loadStats = useCallback(async () => {
     if (!currentProject?.id) return;
@@ -94,6 +103,55 @@ export const ExportPanel: React.FC = () => {
     }
   };
 
+  const handleValidate = async () => {
+    if (!currentProject?.id) return;
+    setValidating(true);
+    setError(null);
+    try {
+      const res = await exportAPI.validate(currentProject.id);
+      setValidationWarnings(res.warnings || []);
+      setSuccess('Validation completed');
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError('Failed to validate project');
+      console.error(err);
+    } finally {
+      setValidating(false);
+    }
+  };
+
+  const handleDockerPresetDownload = async () => {
+    if (!currentProject?.id) return;
+    setPresetLoading(true);
+    setError(null);
+    try {
+      const res = await exportAPI.getDockerPreset(currentProject.id);
+      setValidationWarnings(res.warnings || []);
+      const byteCharacters = atob(res.zip_base64);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = res.filename || `${currentProject.name || currentProject.id}-docker-preset.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      setSuccess('Docker preset downloaded');
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError('Failed to generate Docker preset');
+      console.error(err);
+    } finally {
+      setPresetLoading(false);
+    }
+  };
+
   const handleGitHubExport = async () => {
     if (!currentProject?.id || !repoName || !githubToken) return;
     
@@ -107,7 +165,8 @@ export const ExportPanel: React.FC = () => {
         repoName,
         githubToken,
         repoDescription,
-        isPrivate
+        isPrivate,
+        includeDockerPreset
       );
       
       if (result.success) {
@@ -122,6 +181,44 @@ export const ExportPanel: React.FC = () => {
       setError(errorMessage);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const handleShareFramework = async () => {
+    if (!currentProject?.id) return;
+    setSharingFramework(true);
+    setError(null);
+    try {
+      const res = await shareAPI.shareFramework(currentProject.id);
+      const url = `${window.location.origin}${res.url}`;
+      setShareLink(url);
+      await navigator.clipboard.writeText(url);
+      setSuccess('Share link copied to clipboard');
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError('Failed to create share link');
+      console.error(err);
+    } finally {
+      setSharingFramework(false);
+    }
+  };
+
+  const handleShareSnippet = async () => {
+    if (!currentProject?.id || !snippetPath.trim()) return;
+    setSharingSnippet(true);
+    setError(null);
+    try {
+      const res = await shareAPI.shareSnippet(currentProject.id, snippetPath.trim());
+      const url = `${window.location.origin}${res.url}`;
+      setShareLink(url);
+      await navigator.clipboard.writeText(url);
+      setSuccess('Snippet share link copied');
+      setTimeout(() => setSuccess(null), 2500);
+    } catch (err) {
+      setError('Failed to create snippet link');
+      console.error(err);
+    } finally {
+      setSharingSnippet(false);
     }
   };
 
@@ -181,6 +278,18 @@ export const ExportPanel: React.FC = () => {
             <ExternalLink className="w-3 h-3 ml-auto" />
           </a>
         )}
+        {shareLink && (
+          <div className="flex items-center gap-2 p-3 bg-emerald-500/10 text-emerald-500 rounded-lg text-sm">
+            <Link2 className="w-4 h-4 flex-shrink-0" />
+            <span className="truncate">{shareLink}</span>
+            <button
+              onClick={() => navigator.clipboard.writeText(shareLink)}
+              className="ml-auto text-xs underline"
+            >
+              Copy
+            </button>
+          </div>
+        )}
 
         {/* Project Stats */}
         {loading ? (
@@ -224,6 +333,75 @@ export const ExportPanel: React.FC = () => {
           </div>
         )}
 
+        {/* Validation & Docker preset */}
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <button
+              onClick={handleValidate}
+              disabled={validating}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              {validating ? <Loader2 className="w-4 h-4 animate-spin" /> : <AlertCircle className="w-4 h-4" />}
+              Validate dependencies
+            </button>
+            <button
+              onClick={handleDockerPresetDownload}
+              disabled={presetLoading}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {presetLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileArchive className="w-4 h-4" />}
+              Docker preset
+            </button>
+          </div>
+          {validationWarnings.length > 0 && (
+            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 space-y-2 text-sm text-amber-100">
+              <div className="flex items-center gap-2 font-medium">
+                <AlertCircle className="w-4 h-4" />
+                Warnings
+              </div>
+              <ul className="list-disc list-inside space-y-1 text-amber-50">
+                {validationWarnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+
+        {/* Share links */}
+        <div className="space-y-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button
+              onClick={handleShareFramework}
+              disabled={sharingFramework}
+              className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 transition-colors"
+            >
+              {sharingFramework ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+              Share framework progress
+            </button>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={snippetPath}
+                onChange={(e) => setSnippetPath(e.target.value)}
+                placeholder="path/to/file.tsx"
+                className="flex-1 px-3 py-2 bg-background border border-border rounded-lg text-sm focus:ring-2 focus:ring-primary focus:outline-none"
+              />
+              <button
+                onClick={handleShareSnippet}
+                disabled={sharingSnippet || !snippetPath.trim()}
+                className="flex items-center justify-center gap-2 px-3 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 disabled:opacity-50 transition-colors"
+              >
+                {sharingSnippet ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+                Share file
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Generates read-only links (optional expiry) without requiring sign-in.
+          </p>
+        </div>
+
         {/* Download ZIP */}
         <div className="space-y-2">
           <button
@@ -260,12 +438,23 @@ export const ExportPanel: React.FC = () => {
                   <Github className="w-4 h-4" />
                   Export to GitHub
                 </h4>
+                <div className="flex items-center justify-between">
                 <button
                   onClick={() => setShowGitHubForm(false)}
                   className="text-xs text-muted-foreground hover:text-foreground"
                 >
                   Cancel
                 </button>
+                <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <input
+                    type="checkbox"
+                    checked={includeDockerPreset}
+                    onChange={(e) => setIncludeDockerPreset(e.target.checked)}
+                    className="rounded border-border"
+                  />
+                  Include Docker preset
+                </label>
+              </div>
               </div>
               
               {/* Repository Name */}

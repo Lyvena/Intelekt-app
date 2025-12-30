@@ -23,6 +23,7 @@ from routes.github import router as github_router
 from routes.integration import router as integration_router
 from routes.analytics import router as analytics_router
 from routes.usage import router as usage_router
+from routes.share import router as share_router
 from config import settings, cors_origins
 from models.database import Base, engine
 import os
@@ -109,6 +110,7 @@ app.include_router(github_router)
 app.include_router(integration_router)
 app.include_router(analytics_router)
 app.include_router(usage_router)
+app.include_router(share_router)
 
 
 @app.get("/")

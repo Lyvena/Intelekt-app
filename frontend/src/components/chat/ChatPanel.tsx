@@ -38,6 +38,9 @@ export const ChatPanel: React.FC = () => {
   const currentProjectFiles = useCurrentProjectFiles();
   const [inputMessage, setInputMessage] = useState('');
   const [excludedFiles, setExcludedFiles] = useState<Set<string>>(new Set());
+  const [tokenCount, setTokenCount] = useState(0);
+  const [streamStartTime, setStreamStartTime] = useState<number | null>(null);
+  const [lastPrompt, setLastPrompt] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -65,15 +68,35 @@ export const ChatPanel: React.FC = () => {
     inputRef.current?.focus();
   }, [currentProject?.id]);
 
-  const sendMessage = async () => {
-    if (!inputMessage.trim() || isLoading || !currentProject) return;
+  const runSafetyChecks = (filePath: string, code: string) => {
+    const warnings: string[] = [];
+    const lowerPath = filePath.toLowerCase();
+    if (lowerPath.includes('.env') || lowerPath.includes('secrets')) {
+      warnings.push('Potential secret file path detected. Avoid writing secrets into generated files.');
+    }
+    if (/sk-[A-Za-z0-9]{20,}/.test(code) || /AIza[0-9A-Za-z\-_]{35}/.test(code)) {
+      warnings.push('Content looks like it may contain an API key. Please verify before using.');
+    }
+    if (/aws_secret/i.test(code) || /private_key/i.test(code)) {
+      warnings.push('Sensitive key material detected. Remove or mask secrets.');
+    }
+    if (code.length > 50000) {
+      warnings.push('Large file generated (>50KB). Review before applying to avoid performance issues.');
+    }
+    return warnings;
+  };
+
+  const sendMessage = async (overrideMessage?: string) => {
+    const promptToSend = overrideMessage ?? inputMessage;
+    if (!promptToSend.trim() || isLoading || !currentProject) return;
 
     const startTime = Date.now();
-    const originalPrompt = inputMessage;
+    const originalPrompt = promptToSend;
+    setLastPrompt(promptToSend);
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: inputMessage,
+      content: promptToSend,
       timestamp: new Date().toISOString(),
     };
 
@@ -82,9 +105,11 @@ export const ChatPanel: React.FC = () => {
     setIsLoading(true);
     clearStreamingMessage();
     setGenerationStage('analyzing', 'Understanding your request...');
+    setTokenCount(0);
+    setStreamStartTime(Date.now());
 
     // Save current state to history before changes
-    pushFileHistory(currentProject.id, `Before: ${inputMessage.slice(0, 50)}...`);
+    pushFileHistory(currentProject.id, `Before: ${promptToSend.slice(0, 50)}...`);
 
     try {
       // Build context from relevant files
@@ -93,8 +118,8 @@ export const ChatPanel: React.FC = () => {
         : '';
 
       const messageWithContext = contextString
-        ? `${inputMessage}${contextString}`
-        : inputMessage;
+        ? `${promptToSend}${contextString}`
+        : promptToSend;
 
       // Use streaming endpoint
       const token = await getToken();
@@ -149,6 +174,7 @@ export const ChatPanel: React.FC = () => {
               if (data.type === 'chunk') {
                 fullResponse += data.content;
                 appendStreamingMessage(data.content);
+                setTokenCount((prev) => prev + Math.max(1, Math.round(data.content.length / 4)));
                 // Update stage based on content
                 if (fullResponse.length < 100) {
                   setGenerationStage('planning', 'Designing the solution...');
@@ -156,6 +182,16 @@ export const ChatPanel: React.FC = () => {
                   setGenerationStage('generating', 'Writing the code...');
                 }
               } else if (data.type === 'code') {
+                setGenerationStage('validating', `Checking ${data.file_path} for issues...`);
+                const warnings = runSafetyChecks(data.file_path, data.code);
+                if (warnings.length > 0) {
+                  const warningMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: `⚠️ Safety checks for \`${data.file_path}\`:\n${warnings.map(w => `- ${w}`).join('\n')}\n\nFile was generated; please review before deploying.`,
+                    timestamp: new Date().toISOString(),
+                  };
+                  addMessage(currentProject.id, warningMessage);
+                }
                 setGenerationStage('generating', `Creating ${data.file_path}...`);
                 // Handle generated code - add to project files
                 const existingFiles = allProjectFiles[currentProject.id] || [];
@@ -227,6 +263,17 @@ export const ChatPanel: React.FC = () => {
                 }
               } else if (data.type === 'refined_code') {
                 // Handle refined code - update project files
+                setGenerationStage('validating', `Checking ${data.file_path} for issues...`);
+                const warnings = runSafetyChecks(data.file_path, data.code);
+                if (warnings.length > 0) {
+                  const warningMessage: ChatMessage = {
+                    role: 'assistant',
+                    content: `⚠️ Safety checks for \`${data.file_path}\`:\n${warnings.map(w => `- ${w}`).join('\n')}\n\nFile was refined; please review before deploying.`,
+                    timestamp: new Date().toISOString(),
+                  };
+                  addMessage(currentProject.id, warningMessage);
+                }
+                setGenerationStage('generating', `Updating ${data.file_path}...`);
                 const existingFiles = allProjectFiles[currentProject.id] || [];
                 const fileExists = existingFiles.some(f => f.path === data.file_path);
 
@@ -266,6 +313,7 @@ export const ChatPanel: React.FC = () => {
                 addMessage(currentProject.id, codeMessage);
               } else if (data.type === 'done') {
                 setGenerationStage('complete', 'Generation complete!');
+                setStreamStartTime(null);
                 // Finalize the response
                 if (fullResponse) {
                   console.debug('Final assembled response:', fullResponse);
@@ -305,6 +353,7 @@ export const ChatPanel: React.FC = () => {
     } catch (error) {
       console.error('Failed to send message:', error);
       setGenerationStage('error', 'Failed to generate. Please try again.');
+      setStreamStartTime(null);
       const errorMessage: ChatMessage = {
         role: 'assistant',
         content: 'Sorry, I encountered an error. Please check your API configuration and try again.',
@@ -324,6 +373,14 @@ export const ChatPanel: React.FC = () => {
       sendMessage();
     }
   };
+
+  const retryWithContext = (extraContext: string) => {
+    if (!lastPrompt) return;
+    const retryPrompt = `${lastPrompt}\n\n${extraContext}`;
+    sendMessage(retryPrompt);
+  };
+
+  const elapsedSeconds = streamStartTime ? Math.max(0, Math.round((Date.now() - streamStartTime) / 1000)) : null;
 
   // Auto-resize textarea
   const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
@@ -402,6 +459,48 @@ export const ChatPanel: React.FC = () => {
           <GenerationProgress stage={generationStage} message={generationMessage} />
         )}
 
+        {/* Streaming status + retry chips */}
+        {(isLoading || streamingMessage) && (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span className="px-2 py-1 rounded-full bg-secondary">
+                Tokens ~ {tokenCount}
+              </span>
+              {elapsedSeconds !== null && (
+                <span className="px-2 py-1 rounded-full bg-secondary">
+                  {elapsedSeconds}s elapsed
+                </span>
+              )}
+              <span className="px-2 py-1 rounded-full bg-secondary">
+                Stage: {generationStage}
+              </span>
+              {streamingMessage && (
+                <span className="px-2 py-1 rounded-full bg-primary/10 text-primary">
+                  Streaming…
+                </span>
+              )}
+            </div>
+            {lastPrompt && (
+              <div className="flex flex-wrap gap-2">
+                <button
+                  onClick={() => retryWithContext('Retrying with more context. Please ensure files and dependencies are up to date.')}
+                  className="text-xs px-3 py-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition"
+                  disabled={isLoading}
+                >
+                  Retry with more context
+                </button>
+                <button
+                  onClick={() => retryWithContext('Retrying a concise answer. Focus only on the core change needed.')}
+                  className="text-xs px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 transition"
+                  disabled={isLoading}
+                >
+                  Retry concise
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Loading indicator (fallback) */}
         {isLoading && !streamingMessage && generationStage === 'idle' && (
           <div className="flex gap-3 justify-start">
@@ -464,7 +563,7 @@ export const ChatPanel: React.FC = () => {
             </div>
           </div>
           <button
-            onClick={sendMessage}
+            onClick={() => sendMessage()}
             disabled={isLoading || !inputMessage.trim()}
             className="px-4 py-3 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2 hover:shadow-lg hover:shadow-primary/25"
           >

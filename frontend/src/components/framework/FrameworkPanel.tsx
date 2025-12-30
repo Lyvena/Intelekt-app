@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { frameworkAPI } from '../../services/api';
 import { FrameworkProgress } from './FrameworkProgress';
 import { FrameworkStepPanel } from './FrameworkStepPanel';
@@ -9,8 +9,10 @@ import {
   Download,
   ChevronDown,
   ChevronUp,
-  AlertCircle
+  AlertCircle,
+  FastForward,
 } from 'lucide-react';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 interface FrameworkPanelProps {
   projectId: string;
@@ -41,8 +43,44 @@ interface StepData {
   ai_analysis: string | null;
 }
 
-const normalizeStep = (step: any): StepData => {
+const STEP_GUIDANCE: Record<number, { tips?: string[]; examples?: string[] }> = {
+  1: {
+    tips: [
+      'List at least 5 segments; be specific (e.g., “solo React devs shipping client MVPs”).',
+      'Consider urgency (need), access (channels), and budget.',
+    ],
+    examples: ['Indie devs delivering client MVPs', 'Bootcamp grads freelancing', 'Small agencies (2-5 ppl) doing prototypes'],
+  },
+  2: {
+    tips: ['Pick one segment with highest urgency + easiest reach.', 'State why this is the beachhead in 1-2 lines.'],
+    examples: ['Beachhead: solo/indie developers with 2-5 active clients needing faster MVP delivery.'],
+  },
+  5: {
+    tips: ['Name the persona and describe a day-in-the-life.', 'Highlight pains, goals, and “hire moment.”'],
+    examples: ['Alex, 28, freelance dev shipping MVPs monthly; pain: context switching and slow ramp-up.'],
+  },
+  7: {
+    tips: ['List must-have vs. nice-to-have features.', 'Explicitly exclude out-of-scope items.'],
+    examples: ['Must: chat builder, framework guidance, live preview, export; Nice: team sharing; Out: mobile app.'],
+  },
+  8: {
+    tips: ['Quantify time/cost savings clearly.', 'Compare against status quo.'],
+    examples: ['70% faster delivery; 60% cost reduction vs. manual builds.'],
+  },
+  21: {
+    tips: ['Define MVP scope, success metrics, and test users.', 'Keep timeline/budget tight.'],
+    examples: ['MVP: guided framework + code preview + export; Success: 70% completion, <2s preview; Testers: 20 indie devs.'],
+  },
+};
+
+const normalizeStep = (step: Partial<StepData> & { step_number?: number; user_responses?: Record<string, string> }): StepData => {
   const number = step?.number ?? step?.step_number ?? 0;
+  const safeResponses: Record<string, string> = {};
+  if (step?.user_responses) {
+    Object.entries(step.user_responses).forEach(([k, v]) => {
+      safeResponses[k] = typeof v === 'string' ? v : JSON.stringify(v ?? '');
+    });
+  }
   return {
     number,
     name: step?.name ?? '',
@@ -51,7 +89,7 @@ const normalizeStep = (step: any): StepData => {
     key_questions: Array.isArray(step?.key_questions) ? step.key_questions : [],
     deliverables: Array.isArray(step?.deliverables) ? step.deliverables : [],
     status: step?.status ?? 'not_started',
-    user_responses: step?.user_responses ?? {},
+    user_responses: safeResponses,
     ai_analysis: step?.ai_analysis ?? null,
   };
 };
@@ -70,6 +108,28 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
   const [isExpanded, setIsExpanded] = useState(true);
   const [canComplete, setCanComplete] = useState(false);
   const [lastAiAnalysis, setLastAiAnalysis] = useState<string>('');
+  const [isQuickActionLoading, setIsQuickActionLoading] = useState(false);
+  const { trackEvent } = useAnalytics();
+  const frameworkStartRef = useRef<number>(Date.now());
+  const firstExportTrackedRef = useRef(false);
+  const readyTrackedRef = useRef(false);
+  const [feedbackState, setFeedbackState] = useState<'idle' | 'helpful' | 'not_helpful'>('idle');
+  const [isBugOpen, setIsBugOpen] = useState(false);
+  const [bugText, setBugText] = useState('');
+
+  // Track time-to-ready-for-dev
+  useEffect(() => {
+    if (frameworkState?.readyForDevelopment && !readyTrackedRef.current) {
+      const timeToReadySec = Math.round((Date.now() - frameworkStartRef.current) / 1000);
+      trackEvent('framework', 'ready_for_development', undefined, timeToReadySec, {
+        projectId,
+        idea,
+        completed_steps: frameworkState.completedSteps,
+        progress_percentage: frameworkState.progressPercentage,
+      });
+      readyTrackedRef.current = true;
+    }
+  }, [frameworkState?.readyForDevelopment, frameworkState?.completedSteps, frameworkState?.progressPercentage, idea, projectId, trackEvent]);
 
   const initializeFramework = useCallback(async () => {
     try {
@@ -110,8 +170,17 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
       const { session, progress } = await frameworkAPI.getSession(projectId);
       
       if (session) {
-        setIsInitialized(true);
-        setFrameworkState({
+        setCurrentStepData(normalizeStep(session.step as StepData));
+        setFrameworkState((prev) => prev ? {
+          ...prev,
+          currentStep: progress.current_step,
+          currentPhase: progress.current_phase,
+          completedSteps: progress.completed_steps,
+          totalSteps: progress.total_steps,
+          progressPercentage: progress.progress_percentage,
+          readyForDevelopment: progress.ready_for_development,
+          phasesCompleted: progress.phases_completed,
+        } : {
           currentStep: progress.current_step,
           currentPhase: progress.current_phase,
           completedSteps: progress.completed_steps,
@@ -120,10 +189,6 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
           readyForDevelopment: progress.ready_for_development,
           phasesCompleted: progress.phases_completed,
         });
-        
-        // Get current step data
-        const { step } = await frameworkAPI.getCurrentStep(projectId);
-        setCurrentStepData(normalizeStep(step));
       } else {
         // No session exists, initialize new one
         await initializeFramework();
@@ -156,6 +221,13 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
       );
       
       if (result.success) {
+        const timeSinceStartSec = Math.round((Date.now() - frameworkStartRef.current) / 1000);
+        trackEvent('framework', 'complete_step', `step_${currentStepData.number}`, timeSinceStartSec, {
+          projectId,
+          idea,
+          step: currentStepData.number,
+          phase: currentStepData.phase,
+        });
         if (result.progress) {
           setFrameworkState((prev) => {
             const previous = prev;
@@ -242,6 +314,23 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
     try {
       const { document } = await frameworkAPI.exportDocument(projectId);
       onExportDocument(document);
+      const now = Date.now();
+      const timeToExportSec = Math.round((now - frameworkStartRef.current) / 1000);
+      if (!firstExportTrackedRef.current) {
+        trackEvent('framework', 'first_export', `step_${currentStepData?.number ?? 'unknown'}`, timeToExportSec, {
+          projectId,
+          idea,
+          current_step: currentStepData?.number,
+          ready_for_dev: frameworkState?.readyForDevelopment,
+        });
+        firstExportTrackedRef.current = true;
+      } else {
+        trackEvent('framework', 'export_document', `step_${currentStepData?.number ?? 'unknown'}`, undefined, {
+          projectId,
+          idea,
+          current_step: currentStepData?.number,
+        });
+      }
     } catch (err) {
       console.error('Failed to export document:', err);
       setError('Failed to export framework document.');
@@ -263,6 +352,86 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
     }
   };
 
+  const handleInitializeSample = async () => {
+    try {
+      setIsQuickActionLoading(true);
+      setError(null);
+      const result = await frameworkAPI.initializeSample(projectId, idea);
+      setIsInitialized(true);
+      const progress = await frameworkAPI.getProgress(projectId);
+      setFrameworkState({
+        currentStep: progress.current_step,
+        currentPhase: progress.current_phase,
+        completedSteps: progress.completed_steps,
+        totalSteps: progress.total_steps,
+        progressPercentage: progress.progress_percentage,
+        readyForDevelopment: progress.ready_for_development,
+        phasesCompleted: progress.phases_completed,
+      });
+      setCurrentStepData(normalizeStep(result.step_details));
+      setCanComplete(false);
+      setLastAiAnalysis(result.step_details?.ai_analysis || '');
+    } catch (err) {
+      console.error('Failed to initialize sample framework:', err);
+      setError('Failed to initialize sample framework.');
+    } finally {
+      setIsQuickActionLoading(false);
+    }
+  };
+
+  const handleFastTrack = async () => {
+    try {
+      setIsQuickActionLoading(true);
+      setError(null);
+      const result = await frameworkAPI.fastTrack(projectId, idea);
+      setIsInitialized(true);
+      const progress = result.progress || await frameworkAPI.getProgress(projectId);
+      setFrameworkState({
+        currentStep: progress.current_step,
+        currentPhase: progress.current_phase,
+        completedSteps: progress.completed_steps,
+        totalSteps: progress.total_steps,
+        progressPercentage: progress.progress_percentage,
+        readyForDevelopment: progress.ready_for_development,
+        phasesCompleted: progress.phases_completed,
+      });
+      setCurrentStepData(normalizeStep(result.step_details));
+      setCanComplete(false);
+      setLastAiAnalysis(result.step_details?.ai_analysis || '');
+    } catch (err) {
+      console.error('Failed to fast-track framework:', err);
+      setError('Failed to fast-track framework.');
+    } finally {
+      setIsQuickActionLoading(false);
+    }
+  };
+
+  const handleFeedback = (helpful: boolean) => {
+    setFeedbackState(helpful ? 'helpful' : 'not_helpful');
+    trackEvent('feedback', 'framework_helpfulness', helpful ? 'helpful' : 'not_helpful', undefined, {
+      projectId,
+      idea,
+      step: currentStepData?.number,
+      ready_for_dev: frameworkState?.readyForDevelopment,
+    });
+  };
+
+  const submitBug = () => {
+    if (!bugText.trim()) {
+      setIsBugOpen(false);
+      return;
+    }
+    trackEvent('feedback', 'bug_report', 'framework_panel', undefined, {
+      projectId,
+      idea,
+      step: currentStepData?.number,
+      ready_for_dev: frameworkState?.readyForDevelopment,
+      message: bugText.trim(),
+    });
+    setBugText('');
+    setIsBugOpen(false);
+  };
+
   // Method to update analysis from chat
   const updateAnalysis = (analysis: string) => {
     setLastAiAnalysis(analysis);
@@ -279,10 +448,68 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
 
   if (isLoading && !frameworkState) {
     return (
-      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
         <div className="flex items-center justify-center gap-3">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-500" />
           <span className="text-gray-600 dark:text-gray-400">Initializing MIT 24-Step Framework...</span>
+        </div>
+
+        {/* Feedback & bug report */}
+        <div className="border-t border-gray-200 dark:border-gray-800 px-6 py-4 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-gray-600 dark:text-gray-400">Was this step helpful?</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => handleFeedback(true)}
+                className={`px-3 py-1.5 rounded-lg border text-sm ${feedbackState === 'helpful' ? 'bg-green-50 text-green-700 border-green-200' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              >
+                👍 Helpful
+              </button>
+              <button
+                onClick={() => handleFeedback(false)}
+                className={`px-3 py-1.5 rounded-lg border text-sm ${feedbackState === 'not_helpful' ? 'bg-amber-50 text-amber-700 border-amber-200' : 'border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+              >
+                👎 Not really
+              </button>
+            </div>
+          </div>
+          <div className="flex items-start gap-3">
+            <button
+              onClick={() => setIsBugOpen((v) => !v)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              🐞 Report a bug or issue
+            </button>
+          </div>
+          {isBugOpen && (
+            <div className="flex flex-col gap-2">
+              <textarea
+                value={bugText}
+                onChange={(e) => setBugText(e.target.value)}
+                rows={3}
+                placeholder="What went wrong? Include expected vs actual and any step/context."
+                className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-indigo-500"
+              />
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setBugText('');
+                    setIsBugOpen(false);
+                  }}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={submitBug}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
+                  disabled={!bugText.trim()}
+                >
+                  Submit
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -335,6 +562,12 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
           
           {isExpanded && (
             <div className="border-x border-b border-gray-200 dark:border-gray-700 rounded-b-lg overflow-hidden">
+              {STEP_GUIDANCE[currentStepData.number] && (
+                <div className="px-4 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-700 text-xs text-amber-800 dark:text-amber-200 flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span>Guidance available for this step.</span>
+                </div>
+              )}
               <FrameworkStepPanel
                 step={currentStepData}
                 onComplete={handleCompleteStep}
@@ -343,6 +576,8 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
                 isFirstStep={currentStepData.number === 1}
                 isLastStep={currentStepData.number === 24}
                 canComplete={canComplete}
+                tips={STEP_GUIDANCE[currentStepData.number]?.tips}
+                examples={STEP_GUIDANCE[currentStepData.number]?.examples}
               />
             </div>
           )}
@@ -351,6 +586,23 @@ export const FrameworkPanel: React.FC<FrameworkPanelProps> = ({
 
       {/* Action Buttons */}
       <div className="flex flex-wrap gap-2">
+        <button
+          onClick={handleInitializeSample}
+          disabled={isQuickActionLoading || isLoading}
+          className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-200 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-sm"
+        >
+          <Sparkles className="w-4 h-4" />
+          Sample project
+        </button>
+        <button
+          onClick={handleFastTrack}
+          disabled={isQuickActionLoading || isLoading}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-200 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-900/50 transition-colors text-sm"
+        >
+          <FastForward className="w-4 h-4" />
+          Fast-track (skip to build)
+        </button>
+
         {frameworkState?.readyForDevelopment && (
           <button
             onClick={handleStartDevelopment}

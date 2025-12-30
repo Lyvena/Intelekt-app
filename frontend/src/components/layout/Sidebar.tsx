@@ -16,7 +16,7 @@ import {
 import { useStore } from '../../store/useStore';
 import { useTheme } from '../../contexts/ThemeContext';
 import { projectsAPI } from '../../services/api';
-import type { Project, AIProvider } from '../../types';
+import type { Project, AIProvider, ChatMessage } from '../../types';
 import { cn, formatDate, downloadBlob } from '../../lib/utils';
 import { UsageDisplay } from '../usage';
 
@@ -43,8 +43,18 @@ export const Sidebar: React.FC = () => {
     try {
       const response = await projectsAPI.get(project.id);
       // If the project has stored messages, load them
-      if (response && 'messages' in response) {
-        setMessages(project.id, (response as Project & { messages?: any[] }).messages || []);
+      if (response && typeof response === 'object' && 'messages' in response) {
+        const messages = (response as Project & { messages?: unknown[] }).messages;
+        const chatMessages = Array.isArray(messages)
+          ? messages.filter(
+              (m): m is ChatMessage =>
+                !!m &&
+                typeof m === 'object' &&
+                'role' in m &&
+                'content' in m
+            )
+          : [];
+        setMessages(project.id, chatMessages);
       }
     } catch (error) {
       console.error('Failed to load project:', error);

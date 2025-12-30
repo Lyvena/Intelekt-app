@@ -452,7 +452,8 @@ export const exportAPI = {
     repoName: string,
     githubToken: string,
     description?: string,
-    isPrivate?: boolean
+    isPrivate?: boolean,
+    includeDockerPreset?: boolean
   ): Promise<{
     success: boolean;
     message: string;
@@ -464,6 +465,7 @@ export const exportAPI = {
       github_token: githubToken,
       description: description || '',
       private: isPrivate || false,
+      include_docker_preset: !!includeDockerPreset,
     });
     return response.data;
   },
@@ -479,6 +481,72 @@ export const exportAPI = {
     largest_file_size: number;
   }> => {
     const response = await api.get(`/api/export/stats/${projectId}`);
+    return response.data;
+  },
+
+  // Validate project dependencies / docker
+  validate: async (projectId: string): Promise<{
+    success: boolean;
+    warnings: string[];
+  }> => {
+    const response = await api.get(`/api/export/validate/${projectId}`);
+    return response.data;
+  },
+
+  // Get docker preset bundle
+  getDockerPreset: async (projectId: string): Promise<{
+    success: boolean;
+    warnings: string[];
+    files: Record<string, string>;
+    zip_base64: string;
+    filename: string;
+  }> => {
+    const response = await api.get(`/api/export/docker-preset/${projectId}`);
+    return response.data;
+  },
+};
+
+export const shareAPI = {
+  shareFramework: async (
+    projectId: string,
+    title?: string,
+    expiresInDays: number = 7
+  ): Promise<{ success: boolean; token: string; url: string }> => {
+    const response = await api.post('/api/share/framework', {
+      project_id: projectId,
+      title,
+      expires_in_days: expiresInDays,
+    });
+    return response.data;
+  },
+
+  shareSnippet: async (
+    projectId: string,
+    path: string,
+    content?: string,
+    title?: string,
+    expiresInDays: number = 7
+  ): Promise<{ success: boolean; token: string; url: string }> => {
+    const response = await api.post('/api/share/snippet', {
+      project_id: projectId,
+      path,
+      content,
+      title,
+      expires_in_days: expiresInDays,
+    });
+    return response.data;
+  },
+
+  resolve: async (
+    token: string
+  ): Promise<{
+    success: boolean;
+    type: string;
+    title: string | null;
+    payload: unknown;
+    expires_at: string | null;
+  }> => {
+    const response = await api.get(`/api/share/${token}`);
     return response.data;
   },
 };
@@ -1364,17 +1432,58 @@ export const teamAPI = {
   },
 };
 
+type FrameworkStepDetails = {
+  step_number?: number;
+  number?: number;
+  name: string;
+  description: string;
+  phase: string;
+  key_questions?: string[];
+  deliverables?: string[];
+  user_responses?: Record<string, string>;
+  ai_analysis?: string | null;
+  status?: string;
+};
+
+type FrameworkInitResponse = {
+  success: boolean;
+  project_id: string;
+  current_step: number;
+  current_phase: string;
+  step_details: FrameworkStepDetails;
+  message: string;
+};
+
+type FrameworkProgressResponse = {
+  current_step: number;
+  current_phase: string;
+  completed_steps: number;
+  total_steps: number;
+  progress_percentage: number;
+  ready_for_development: boolean;
+  phases_completed: Record<string, boolean>;
+};
+
 export const frameworkAPI = {
   // Initialize the MIT 24-Step framework for a project
-  initialize: async (projectId: string, idea: string): Promise<{
-    success: boolean;
-    project_id: string;
-    current_step: number;
-    current_phase: string;
-    step_details: any;
-    message: string;
-  }> => {
+  initialize: async (projectId: string, idea: string): Promise<FrameworkInitResponse> => {
     const response = await api.post(`/api/framework/initialize/${projectId}`, {
+      description: idea,
+    });
+    return response.data;
+  },
+
+  // Initialize a sample, fully prefilled framework
+  initializeSample: async (projectId: string, idea: string = "Sample: Intelekt - AI MVP Copilot"): Promise<FrameworkInitResponse> => {
+    const response = await api.post(`/api/framework/initialize-sample/${projectId}`, {
+      description: idea,
+    });
+    return response.data;
+  },
+
+  // Fast-track the framework (skip key steps, mark ready)
+  fastTrack: async (projectId: string, idea: string = "Fast-track: ready to build"): Promise<FrameworkInitResponse & { progress: FrameworkProgressResponse }> => {
+    const response = await api.post(`/api/framework/fast-track/${projectId}`, {
       description: idea,
     });
     return response.data;
@@ -1382,8 +1491,8 @@ export const frameworkAPI = {
 
   // Get framework session
   getSession: async (projectId: string): Promise<{
-    session: any;
-    progress: any;
+    session: Record<string, unknown>;
+    progress: FrameworkProgressResponse;
   }> => {
     const response = await api.get(`/api/framework/session/${projectId}`);
     return response.data;
@@ -1391,8 +1500,8 @@ export const frameworkAPI = {
 
   // Get current step
   getCurrentStep: async (projectId: string): Promise<{
-    step: any;
-    progress: any;
+    step: FrameworkStepDetails;
+    progress: FrameworkProgressResponse;
   }> => {
     const response = await api.get(`/api/framework/step/${projectId}`);
     return response.data;
@@ -1400,15 +1509,7 @@ export const frameworkAPI = {
 
   // Get specific step details
   getStepDetails: async (projectId: string, stepNumber: number): Promise<{
-    step: {
-      step_number: number;
-      name: string;
-      description: string;
-      phase: string;
-      key_questions: string[];
-      deliverables: string[];
-      estimated_time: string;
-    };
+    step: FrameworkStepDetails & { estimated_time?: string };
   }> => {
     const response = await api.get(`/api/framework/step/${projectId}/${stepNumber}`);
     return response.data;
@@ -1619,6 +1720,29 @@ export const analyticsAPI = {
     return response.data;
   },
 
+  // Product analytics (framework + preview)
+  getProductAnalytics: async (days: number = 30): Promise<{ success: boolean; data: {
+    window_days: number;
+    framework: {
+      ready_count: number;
+      avg_time_to_ready_sec: number | null;
+      first_export_count: number;
+      avg_time_to_first_export_sec: number | null;
+      step_completions: number;
+      export_count: number;
+    };
+    preview: {
+      starts: number;
+      success: number;
+      errors: number;
+      success_rate: number | null;
+      avg_duration_sec: number | null;
+    };
+  }}> => {
+    const response = await api.get('/api/analytics/product', { params: { days } });
+    return response.data;
+  },
+
   // Track AI usage
   trackAIUsage: async (data: {
     provider: string;
@@ -1775,7 +1899,7 @@ export const authAPI = {
     return response.data;
   },
 
-  post: async (url: string, data?: any) => {
+  post: async (url: string, data?: unknown) => {
     return api.post(url, data);
   },
 

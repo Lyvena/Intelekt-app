@@ -54,6 +54,47 @@ async def initialize_framework(project_id: str, idea: dict):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/initialize-sample/{project_id}")
+async def initialize_sample_framework(project_id: str, idea: dict):
+    """
+    Initialize a sample, fully prefilled framework session for demo/preview.
+    """
+    try:
+        idea_description = idea.get("description", "Sample: Intelekt - AI MVP Copilot")
+        session = framework_service.initialize_sample_framework(project_id, idea_description)
+        return {
+            "success": True,
+            "project_id": project_id,
+            "current_step": session["current_step"],
+            "current_phase": session["current_phase"],
+            "step_details": session["steps"][str(session["current_step"])],
+            "message": "Sample framework initialized with prefilled answers."
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/fast-track/{project_id}")
+async def fast_track_framework(project_id: str, idea: dict):
+    """
+    Fast-track the framework by skipping key steps for advanced users.
+    """
+    try:
+        idea_description = idea.get("description", "Fast-track: ready to build")
+        session = framework_service.fast_track_framework(project_id, idea_description)
+        return {
+            "success": True,
+            "project_id": project_id,
+            "current_step": session["current_step"],
+            "current_phase": session["current_phase"],
+            "step_details": session["steps"][str(session["current_step"])],
+            "message": "Framework fast-tracked. Required steps marked as skipped. Ready to develop.",
+            "progress": framework_service.get_framework_progress(project_id),
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/session/{project_id}")
 async def get_framework_session(project_id: str):
     """Get the current framework session for a project."""

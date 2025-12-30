@@ -90,7 +90,7 @@ export const CollaborativeEditor: React.FC = () => {
         bindingRef.current = null;
       }
     };
-  }, [currentProject?.id, currentFile?.path, isCollabEnabled]);
+  }, [currentProject, currentFile, isCollabEnabled]);
 
   const handleEditorMount: OnMount = useCallback((editor) => {
     editorRef.current = editor;

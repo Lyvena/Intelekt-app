@@ -21,6 +21,8 @@ interface FrameworkStepPanelProps {
   isFirstStep: boolean;
   isLastStep: boolean;
   canComplete: boolean;
+  tips?: string[];
+  examples?: string[];
 }
 
 export const FrameworkStepPanel: React.FC<FrameworkStepPanelProps> = ({
@@ -31,6 +33,8 @@ export const FrameworkStepPanel: React.FC<FrameworkStepPanelProps> = ({
   isFirstStep,
   isLastStep,
   canComplete,
+  tips = [],
+  examples = [],
 }) => {
   const getPhaseColor = (phase: string) => {
     const colors: Record<string, string> = {
@@ -83,6 +87,26 @@ export const FrameworkStepPanel: React.FC<FrameworkStepPanelProps> = ({
         {/* Description */}
         <p className="text-gray-700 dark:text-gray-300">{step.description}</p>
 
+        {/* Quick tips */}
+        {tips.length > 0 && (
+          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-3 border border-amber-200 dark:border-amber-700">
+            <div className="flex items-center gap-2 mb-2">
+              <HelpCircle className="w-4 h-4 text-amber-600" />
+              <span className="text-sm font-medium text-amber-800 dark:text-amber-200">
+                Quick tips
+              </span>
+            </div>
+            <ul className="space-y-1.5">
+              {tips.map((tip, idx) => (
+                <li key={idx} className="text-sm text-amber-800 dark:text-amber-200 flex items-start gap-2">
+                  <span className="text-amber-500 mt-1">•</span>
+                  <span>{tip}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         {/* Key Questions */}
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3 border border-blue-200 dark:border-blue-800">
           <div className="flex items-center gap-2 mb-2">
@@ -128,6 +152,23 @@ export const FrameworkStepPanel: React.FC<FrameworkStepPanelProps> = ({
             <p className="text-sm text-purple-700 dark:text-purple-400 whitespace-pre-wrap">
               {step.ai_analysis}
             </p>
+          </div>
+        )}
+
+        {/* Examples */}
+        {examples.length > 0 && (
+          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3 border border-gray-200 dark:border-gray-700">
+            <div className="text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
+              Examples
+            </div>
+            <ul className="space-y-1.5">
+              {examples.map((example, idx) => (
+                <li key={idx} className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+                  <span className="text-gray-400 mt-1">•</span>
+                  <span>{example}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>

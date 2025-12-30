@@ -18,6 +18,7 @@ class ExportToGitHubRequest(BaseModel):
     github_token: str
     description: Optional[str] = ""
     private: bool = False
+    include_docker_preset: bool = False
 
 
 class DownloadRequest(BaseModel):
@@ -50,6 +51,50 @@ async def download_zip(request: DownloadRequest):
                 "Content-Disposition": f'attachment; filename="{filename}"'
             }
         )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/validate/{project_id}")
+async def validate_project(project_id: str):
+    """Validate project dependencies and Docker presence."""
+    try:
+        project_files = code_generator.get_project_files(project_id)
+        if not project_files:
+            raise HTTPException(status_code=404, detail="Project not found or has no files")
+        files = {f["path"]: f["content"] for f in project_files}
+        result = export_service.validate_dependencies(files)
+        return {"success": True, **result}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/docker-preset/{project_id}")
+async def docker_preset(project_id: str):
+    """Generate Docker preset bundle (Dockerfile, docker-compose, README)."""
+    try:
+        project_files = code_generator.get_project_files(project_id)
+        if not project_files:
+            raise HTTPException(status_code=404, detail="Project not found or has no files")
+        files = {f["path"]: f["content"] for f in project_files}
+        preset_files = export_service.generate_docker_preset(files, project_id)
+        validation = export_service.validate_dependencies(files)
+
+        zip_bytes = export_service.create_zip(preset_files, project_id, include_readme=False)
+        import base64
+        zip_b64 = base64.b64encode(zip_bytes).decode("utf-8")
+
+        return {
+            "success": True,
+            "warnings": validation.get("warnings", []),
+            "files": preset_files,
+            "zip_base64": zip_b64,
+            "filename": f"{project_id}-docker-preset.zip",
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -104,6 +149,10 @@ async def export_to_github(request: ExportToGitHubRequest):
             raise HTTPException(status_code=404, detail="Project not found or has no files")
         
         files = {f["path"]: f["content"] for f in project_files}
+        # Optionally include Docker preset
+        if request.include_docker_preset:
+            preset = export_service.generate_docker_preset(files, request.repo_name or request.project_id)
+            files = {**files, **preset}
         
         success, message, repo_url = await export_service.export_to_github(
             files=files,

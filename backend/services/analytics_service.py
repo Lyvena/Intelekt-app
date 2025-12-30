@@ -603,11 +603,10 @@ class AnalyticsService:
         unique_users = set(e.user_id for e in events if e.user_id)
         
         # Calculate metrics
-        chat_events = [e for e in events if e.event_category == self.CATEGORY_CHAT]
-        code_events = [e for e in events if e.event_category == self.CATEGORY_CODE_GEN]
         framework_events = [e for e in events if e.event_category == self.CATEGORY_FRAMEWORK]
-        
-        # Calculate bounce rate
+        code_events = [e for e in events if e.event_category == self.CATEGORY_CODE_GEN]
+        chat_events = [e for e in events if e.event_category == self.CATEGORY_CHAT]
+        preview_events = [e for e in events if e.event_category == "preview"]
         bounced = len([s for s in sessions if s.is_bounced])
         bounce_rate = bounced / len(sessions) if sessions else 0
         

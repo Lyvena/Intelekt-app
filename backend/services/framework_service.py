@@ -401,6 +401,33 @@ class FrameworkService:
     
     def __init__(self):
         self.sessions: Dict[str, Dict] = {}  # project_id -> framework state
+        # Lightweight sample content to prefill the framework for demo purposes
+        self.sample_responses: Dict[int, Dict[str, Any]] = {
+            1: {"ai_analysis": "Targeting indie developers needing faster MVP launches.", "user_responses": {"segments": "Indie devs, small agencies, early founders"}},
+            2: {"ai_analysis": "Beachhead: solo/indie developers building client MVPs.", "user_responses": {"beachhead": "Indie developers with 2-5 active clients"}},
+            3: {"ai_analysis": "Persona: Alex, 28, freelance developer shipping MVPs monthly.", "user_responses": {"persona": "Alex, 28, ships MVPs for clients"}},
+            4: {"ai_analysis": "TAM: ~45k indie developers globally, ~$300M annual spend.", "user_responses": {"tam": "$300M TAM"}},
+            5: {"ai_analysis": "Persona pain: time-to-first-commit, context switching.", "user_responses": {"pain": "Slow project ramp, context switching"}},
+            6: {"ai_analysis": "Lifecycle: brief intake → scaffold → iterate → export/deploy.", "user_responses": {}},
+            7: {"ai_analysis": "Spec: chat-based builder, framework guidance, live preview, export.", "user_responses": {}},
+            8: {"ai_analysis": "Value: 70% faster delivery; 60% cost reduction.", "user_responses": {}},
+            9: {"ai_analysis": "Next customers: freelancers, bootcamps, micro-agencies.", "user_responses": {}},
+            10: {"ai_analysis": "Core: integrated business + code guidance.", "user_responses": {}},
+            11: {"ai_analysis": "Position: faster than no-code, more guided than Copilot.", "user_responses": {}},
+            12: {"ai_analysis": "DMU: indie dev (user + buyer).", "user_responses": {}},
+            13: {"ai_analysis": "Acquisition: content, communities, referrals.", "user_responses": {}},
+            14: {"ai_analysis": "Follow-on TAM: small teams, edu, enterprise prototypes.", "user_responses": {}},
+            15: {"ai_analysis": "Model: SaaS subscriptions (free, Pro, Team).", "user_responses": {}},
+            16: {"ai_analysis": "Pricing: $29 Pro, $99 Team seat.", "user_responses": {}},
+            17: {"ai_analysis": "LTV: $450 indie; $2.4k team cohorts.", "user_responses": {}},
+            18: {"ai_analysis": "Sales: PLG with upgrade nudges; demos for teams.", "user_responses": {}},
+            19: {"ai_analysis": "COCA: <$75 target via content + referrals.", "user_responses": {}},
+            20: {"ai_analysis": "Key assumptions: AI quality, conversion 12%+, churn <8%.", "user_responses": {}},
+            21: {"ai_analysis": "MVP test: guided framework + code preview + export.", "user_responses": {}},
+            22: {"ai_analysis": "Assumption tests: completion rate, preview success, exports.", "user_responses": {}},
+            23: {"ai_analysis": "MVBP: paid Pro tier with export/deploy reliability.", "user_responses": {}},
+            24: {"ai_analysis": "Product plan: improve preview, add team collab, enterprise pilots.", "user_responses": {}},
+        }
     
     def initialize_framework(self, project_id: str, idea_description: str) -> Dict:
         """Initialize a new framework session for a project."""
@@ -421,6 +448,39 @@ class FrameworkService:
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
+        self.sessions[project_id] = session
+        return session
+    
+    def initialize_sample_framework(self, project_id: str, idea_description: str = "Sample: Intelekt - AI MVP Copilot") -> Dict:
+        """Initialize a sample session with prefilled analyses for demo/preview."""
+        session = self.initialize_framework(project_id, idea_description)
+        for step_num, payload in self.sample_responses.items():
+            key = str(step_num)
+            if key in session["steps"]:
+                session["steps"][key]["ai_analysis"] = payload.get("ai_analysis")
+                session["steps"][key]["user_responses"] = payload.get("user_responses", {})
+                session["steps"][key]["status"] = StepStatus.COMPLETED
+                session["steps"][key]["completed_at"] = datetime.now().isoformat()
+        session["current_step"] = 24
+        session["current_phase"] = FrameworkPhase.SCALING
+        session["ready_for_development"] = True
+        session["updated_at"] = datetime.now().isoformat()
+        self.sessions[project_id] = session
+        return session
+    
+    def fast_track_framework(self, project_id: str, idea_description: str) -> Dict:
+        """Fast-track by marking key steps as skipped to allow development quickly."""
+        session = self.initialize_framework(project_id, idea_description)
+        required_steps = [1, 2, 5, 7, 8, 21]
+        for step_num in required_steps:
+            key = str(step_num)
+            session["steps"][key]["status"] = StepStatus.SKIPPED
+            session["steps"][key]["ai_analysis"] = session["steps"][key]["ai_analysis"] or "Fast-tracked placeholder - please refine."
+            session["steps"][key]["completed_at"] = datetime.now().isoformat()
+        session["current_step"] = max(required_steps)
+        session["current_phase"] = session["steps"][str(session["current_step"])]["phase"]
+        session["ready_for_development"] = True
+        session["updated_at"] = datetime.now().isoformat()
         self.sessions[project_id] = session
         return session
     

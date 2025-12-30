@@ -13,14 +13,17 @@ import {
   Calendar,
   Bot,
   Target,
-  Layers
+  Layers,
+  Compass,
+  Gauge,
 } from 'lucide-react';
 import { analyticsAPI } from '../../services/api';
 import type {
   DashboardMetrics,
   RealtimeMetrics,
   FrameworkAnalytics,
-  AIProviderAnalytics
+  AIProviderAnalytics,
+  ProductAnalytics,
 } from '../../types';
 import { MetricCard } from './MetricCard';
 import { ActivityChart } from './ActivityChart';
@@ -38,6 +41,7 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }
   const [realtimeMetrics, setRealtimeMetrics] = useState<RealtimeMetrics | null>(null);
   const [frameworkAnalytics, setFrameworkAnalytics] = useState<FrameworkAnalytics | null>(null);
   const [aiAnalytics, setAIAnalytics] = useState<AIProviderAnalytics | null>(null);
+  const [productAnalytics, setProductAnalytics] = useState<ProductAnalytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [days, setDays] = useState(30);
@@ -48,15 +52,17 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }
       setLoading(true);
       setError(null);
       
-      const [dashboardRes, frameworkRes, aiRes] = await Promise.all([
+      const [dashboardRes, frameworkRes, aiRes, productRes] = await Promise.all([
         analyticsAPI.getDashboard(userId, days),
         analyticsAPI.getFrameworkAnalytics(days),
-        analyticsAPI.getAIProviderAnalytics(days)
+        analyticsAPI.getAIProviderAnalytics(days),
+        analyticsAPI.getProductAnalytics(days),
       ]);
 
       if (dashboardRes.success) setMetrics(dashboardRes.data);
       if (frameworkRes.success) setFrameworkAnalytics(frameworkRes.data);
       if (aiRes.success) setAIAnalytics(aiRes.data);
+      if (productRes.success) setProductAnalytics(productRes.data);
     } catch (err) {
       setError('Failed to load analytics data');
       console.error('Analytics error:', err);
@@ -291,6 +297,145 @@ export const AnalyticsDashboard: React.FC<AnalyticsDashboardProps> = ({ userId }
           {frameworkAnalytics && <FrameworkMetrics analytics={frameworkAnalytics} />}
         </div>
       </div>
+
+      {/* Product Engagement (framework + preview) */}
+      {productAnalytics && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+          <div className="bg-gradient-to-br from-indigo-900/60 via-gray-900 to-gray-900 rounded-xl p-6 border border-gray-700/60 shadow-lg shadow-indigo-900/30">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Compass className="w-5 h-5 text-indigo-300" />
+                <h3 className="text-lg font-semibold text-white">Framework Readiness</h3>
+              </div>
+              <span className="text-xs px-2 py-1 rounded-full bg-indigo-500/20 text-indigo-200">
+                {productAnalytics.window_days}d window
+              </span>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Ready for Dev</span>
+                <span className="text-white text-xl font-bold">{productAnalytics.framework.ready_count}</span>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm text-gray-300 mb-1">
+                  <span>Avg. time to ready</span>
+                  <span className="text-white font-semibold">
+                    {productAnalytics.framework.avg_time_to_ready_sec != null
+                      ? `${Math.round(productAnalytics.framework.avg_time_to_ready_sec / 60)} min`
+                      : '—'}
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500"
+                    style={{
+                      width: productAnalytics.framework.avg_time_to_ready_sec
+                        ? `${Math.min(100, (productAnalytics.framework.avg_time_to_ready_sec / (60 * 60)) * 100)}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Step completions</span>
+                <span className="text-white font-semibold">{productAnalytics.framework.step_completions}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-900/60 via-gray-900 to-gray-900 rounded-xl p-6 border border-gray-700/60 shadow-lg shadow-emerald-900/30">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Gauge className="w-5 h-5 text-emerald-300" />
+                <h3 className="text-lg font-semibold text-white">Exports</h3>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">First exports</span>
+                <span className="text-white text-xl font-bold">{productAnalytics.framework.first_export_count}</span>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm text-gray-300 mb-1">
+                  <span>Avg. time to first export</span>
+                  <span className="text-white font-semibold">
+                    {productAnalytics.framework.avg_time_to_first_export_sec != null
+                      ? `${Math.round(productAnalytics.framework.avg_time_to_first_export_sec / 60)} min`
+                      : '—'}
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500"
+                    style={{
+                      width: productAnalytics.framework.avg_time_to_first_export_sec
+                        ? `${Math.min(100, (productAnalytics.framework.avg_time_to_first_export_sec / (60 * 60)) * 100)}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Total exports</span>
+                <span className="text-white font-semibold">{productAnalytics.framework.export_count}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-900/50 via-gray-900 to-gray-900 rounded-xl p-6 border border-gray-700/60 shadow-lg shadow-amber-900/30">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Zap className="w-5 h-5 text-amber-300" />
+                <h3 className="text-lg font-semibold text-white">Preview Performance</h3>
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-white/5 rounded-lg py-2">
+                  <div className="text-xs text-gray-300">Starts</div>
+                  <div className="text-white font-semibold">{productAnalytics.preview.starts}</div>
+                </div>
+                <div className="bg-white/5 rounded-lg py-2">
+                  <div className="text-xs text-gray-300">Success</div>
+                  <div className="text-white font-semibold">{productAnalytics.preview.success}</div>
+                </div>
+                <div className="bg-white/5 rounded-lg py-2">
+                  <div className="text-xs text-gray-300">Errors</div>
+                  <div className="text-white font-semibold">{productAnalytics.preview.errors}</div>
+                </div>
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm text-gray-300 mb-1">
+                  <span>Success rate</span>
+                  <span className="text-white font-semibold">
+                    {productAnalytics.preview.success_rate != null
+                      ? `${Math.round(productAnalytics.preview.success_rate * 100)}%`
+                      : '—'}
+                  </span>
+                </div>
+                <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-amber-500"
+                    style={{
+                      width: productAnalytics.preview.success_rate != null
+                        ? `${Math.min(100, Math.round(productAnalytics.preview.success_rate * 100))}%`
+                        : '0%',
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-300">Avg. duration</span>
+                <span className="text-white font-semibold">
+                  {productAnalytics.preview.avg_duration_sec != null
+                    ? `${Math.round(productAnalytics.preview.avg_duration_sec)}s`
+                    : '—'}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Additional Stats Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

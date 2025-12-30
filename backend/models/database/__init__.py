@@ -11,9 +11,11 @@ from .analytics import (
     ConversionFunnel,
     AIUsageMetrics
 )
+from .share import ShareLink, ShareType
 
 __all__ = [
     "Base", "get_db", "engine", "SessionLocal", "User", "DBProject",
     "AnalyticsEvent", "UserSession", "ProjectAnalytics", "DailyMetrics",
-    "UserMetrics", "FeatureUsage", "ConversionFunnel", "AIUsageMetrics"
+    "UserMetrics", "FeatureUsage", "ConversionFunnel", "AIUsageMetrics",
+    "ShareLink", "ShareType"
 ]

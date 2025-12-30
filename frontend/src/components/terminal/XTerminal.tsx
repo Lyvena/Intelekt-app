@@ -87,9 +87,9 @@ export const XTerminal: React.FC<XTerminalProps> = ({ projectId, onCommand }) =>
     window.addEventListener('resize', handleResize);
 
     // Cleanup
+    const ws = wsRef.current;
     return () => {
       window.removeEventListener('resize', handleResize);
-      const ws = wsRef.current;
       ws?.close();
       term.dispose();
     };

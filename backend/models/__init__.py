@@ -4,7 +4,6 @@ from .schemas import (
     ChatMessage,
     ChatRequest,
     ChatResponse,
-    Project,
     ProjectCreate,
     CodeGenerationRequest,
     CodeGenerationResponse,

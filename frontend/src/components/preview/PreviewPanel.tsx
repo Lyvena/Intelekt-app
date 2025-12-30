@@ -10,9 +10,12 @@ import {
   Tablet,
   Monitor,
   RotateCcw,
+  ExternalLink,
 } from 'lucide-react';
 import { authAPI } from '../../services/api';
 import { cn } from '../../lib/utils';
+import { Skeleton } from '../common/Skeleton';
+import { useAnalytics } from '../analytics/useAnalytics';
 
 // Device presets for responsive preview
 const DEVICE_PRESETS = {
@@ -51,6 +54,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   const [selectedDevice, setSelectedDevice] = useState<DeviceType>('desktop');
   const [isRotated, setIsRotated] = useState(false);
   const [scale, setScale] = useState(1);
+  const [statusHint, setStatusHint] = useState<string>('');
+  const { trackEvent } = useAnalytics();
 
   const currentDevice = DEVICE_PRESETS[selectedDevice];
   
@@ -59,7 +64,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
     if (selectedDevice === 'desktop') {
       return { width: '100%', height: '100%' };
     }
-    
+
     const width = typeof currentDevice.width === 'number' ? currentDevice.width : 1280;
     const height = typeof currentDevice.height === 'number' ? currentDevice.height : 800;
     
@@ -72,7 +77,29 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   const dimensions = getDeviceDimensions();
 
   const runPreview = async () => {
+    const startedAt = Date.now();
+    trackEvent('preview', 'start', projectType, undefined, {
+      projectId,
+      entry_point: entryPoint,
+      file_count: Object.keys(files || {}).length,
+    });
+    setStatusHint('Checking files…');
+    if (projectType === 'python' && !files[entryPoint]) {
+      setError(`Entry point "${entryPoint}" not found. Please add it and retry.`);
+      setStatusHint('');
+      return;
+    }
+    if (projectType === 'javascript' && !files[entryPoint]) {
+      setError(`Entry point "${entryPoint}" not found. Please add it and retry.`);
+      return;
+    }
+    if (projectType === 'html' && !files['index.html']) {
+      setError('index.html is missing. Add it and rerun preview.');
+      return;
+    }
+
     setLoading(true);
+    setStatusHint('Packaging files…');
     setError('');
     setOutput('');
 
@@ -85,12 +112,14 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
           files,
           entry_point: entryPoint,
         });
+        setStatusHint('Running Python preview…');
       } else if (projectType === 'javascript') {
         response = await authAPI.post('/preview/javascript', {
           project_id: projectId,
           files,
           entry_point: entryPoint,
         });
+        setStatusHint('Running JavaScript preview…');
       } else if (projectType === 'html') {
         const htmlContent = files['index.html'] || '';
         const cssContent = files['style.css'] || '';
@@ -102,6 +131,7 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
           css: cssContent,
           js: jsContent,
         });
+        setStatusHint('Rendering HTML preview…');
       }
 
       if (response && response.data.success) {
@@ -109,11 +139,32 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
         if (projectType !== 'html') {
           setOutput(response.data.output);
         }
+        setStatusHint('Ready');
+        const elapsedMs = Date.now() - startedAt;
+        trackEvent('preview', 'success', projectType, Math.round(elapsedMs / 1000), {
+          projectId,
+          entry_point: entryPoint,
+          preview_id: response.data.preview_id,
+        });
       } else {
         setError(response?.data?.detail || 'Preview failed');
+        setStatusHint('');
       }
-    } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to run preview');
+    } catch (err: unknown) {
+      const maybeDetail =
+        typeof err === 'object' &&
+        err !== null &&
+        'response' in err &&
+        typeof (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+          ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          : null;
+      setError(maybeDetail || 'Failed to run preview');
+      trackEvent('preview', 'error', projectType, undefined, {
+        projectId,
+        entry_point: entryPoint,
+        detail: maybeDetail || 'Failed to run preview',
+      });
+      setStatusHint('');
     } finally {
       setLoading(false);
     }
@@ -126,8 +177,8 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-gray-900 rounded-lg shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
@@ -135,6 +186,9 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
               Live Preview - {projectType.toUpperCase()}
             </h2>
+            {statusHint && (
+              <span className="text-xs text-gray-500 dark:text-gray-400">{statusHint}</span>
+            )}
           </div>
           
           {/* Device Controls */}
@@ -236,6 +290,16 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             </div>
           )}
           
+          {projectType === 'html' && previewId && (
+            <button
+              onClick={() => window.open(`/api/preview/${previewId}`, '_blank', 'noopener,noreferrer')}
+              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+              title="Open preview in new tab"
+            >
+              <ExternalLink className="w-5 h-5 text-gray-600 dark:text-gray-300" />
+            </button>
+          )}
+
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
@@ -251,12 +315,21 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
             <div className="h-full flex items-center justify-center">
               {selectedDevice === 'desktop' ? (
                 // Full-width responsive preview
-                <iframe
-                  src={`/api/preview/${previewId}`}
-                  className="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-white"
-                  title="HTML Preview"
-                  sandbox="allow-scripts allow-same-origin"
-                />
+                <div className="w-full h-full">
+                  {loading ? (
+                    <div className="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-white p-4 space-y-3">
+                      <Skeleton className="w-32 h-4" />
+                      <Skeleton className="w-full h-[60vh]" />
+                    </div>
+                  ) : (
+                    <iframe
+                      src={`/api/preview/${previewId}`}
+                      className="w-full h-full border border-gray-200 dark:border-gray-700 rounded-lg bg-white"
+                      title="HTML Preview"
+                      sandbox="allow-scripts allow-same-origin"
+                    />
+                  )}
+                </div>
               ) : (
                 // Device frame preview
                 <div 
@@ -279,16 +352,23 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
                       height: typeof dimensions.height === 'number' ? dimensions.height : '100%',
                     }}
                   >
-                    <iframe
-                      src={`/api/preview/${previewId}`}
-                      className="w-full h-full border-0"
-                      title="HTML Preview"
-                      sandbox="allow-scripts allow-same-origin"
-                      style={{
-                        width: typeof dimensions.width === 'number' ? dimensions.width : '100%',
-                        height: typeof dimensions.height === 'number' ? dimensions.height : '100%',
-                      }}
-                    />
+                    {loading ? (
+                      <div className="w-full h-full p-4 space-y-3">
+                        <Skeleton className="w-24 h-4" />
+                        <Skeleton className="w-full h-full" />
+                      </div>
+                    ) : (
+                      <iframe
+                        src={`/api/preview/${previewId}`}
+                        className="w-full h-full border-0"
+                        title="HTML Preview"
+                        sandbox="allow-scripts allow-same-origin"
+                        style={{
+                          width: typeof dimensions.width === 'number' ? dimensions.width : '100%',
+                          height: typeof dimensions.height === 'number' ? dimensions.height : '100%',
+                        }}
+                      />
+                    )}
                   </div>
                   
                   {/* Device info */}
@@ -309,6 +389,20 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
                     <p className="text-red-700 dark:text-red-300 text-sm mt-1 font-mono">
                       {error}
                     </p>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={runPreview}
+                        className="text-sm px-3 py-1.5 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                      >
+                        Retry
+                      </button>
+                      <button
+                        onClick={() => setError('')}
+                        className="text-sm px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                      >
+                        Dismiss
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -345,6 +439,23 @@ export const PreviewPanel: React.FC<PreviewPanelProps> = ({
                   <p className="text-gray-500 dark:text-gray-400">
                     Click "Run Preview" to execute your code
                   </p>
+                </div>
+              )}
+
+              {loading && (
+                <div className="bg-white dark:bg-gray-900 rounded-lg p-6 border border-gray-200 dark:border-gray-800">
+                  <div className="flex items-center gap-3">
+                    <Loader className="w-5 h-5 animate-spin text-blue-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-white">Running preview…</p>
+                      <p className="text-xs text-gray-500 dark:text-gray-400">Packaging files and executing in sandbox</p>
+                    </div>
+                  </div>
+                  <div className="mt-4 space-y-2">
+                    <Skeleton className="w-full h-3" />
+                    <Skeleton className="w-5/6 h-3" />
+                    <Skeleton className="w-2/3 h-3" />
+                  </div>
                 </div>
               )}
             </div>

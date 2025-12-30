@@ -36,8 +36,15 @@ export function ResetPasswordForm({ token, onSuccess, onBack }: ResetPasswordFor
             setTimeout(() => {
                 onSuccess();
             }, 2000);
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Failed to reset password');
+        } catch (err: unknown) {
+            const maybeDetail =
+                typeof err === 'object' &&
+                err !== null &&
+                'response' in err &&
+                typeof (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+                    ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    : null;
+            setError(maybeDetail || 'Failed to reset password');
         } finally {
             setLoading(false);
         }

@@ -41,8 +41,15 @@ export function SignUpForm({ onSuccess, onSwitchToLogin }: SignUpFormProps) {
             localStorage.setItem('token', response.access_token);
             localStorage.setItem('user', JSON.stringify(response.user));
             onSuccess();
-        } catch (err: any) {
-            setError(err.response?.data?.detail || 'Failed to create account');
+        } catch (err: unknown) {
+            const maybeDetail =
+                typeof err === 'object' &&
+                err !== null &&
+                'response' in err &&
+                typeof (err as { response?: { data?: { detail?: unknown } } }).response?.data?.detail === 'string'
+                    ? (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+                    : null;
+            setError(maybeDetail || 'Failed to create account');
         } finally {
             setLoading(false);
         }

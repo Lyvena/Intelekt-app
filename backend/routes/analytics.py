@@ -357,6 +357,19 @@ async def get_framework_analytics(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/product")
+async def get_product_analytics(
+    days: int = Query(30, ge=1, le=365),
+    db: Session = Depends(get_db)
+):
+    """Get product engagement metrics (framework + preview)."""
+    try:
+        analytics = analytics_service.get_product_metrics(db, days)
+        return {"success": True, "data": analytics}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/ai-providers")
 async def get_ai_provider_analytics(
     days: int = Query(30, ge=1, le=365),
