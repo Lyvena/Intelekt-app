@@ -33,7 +33,7 @@ const FeatureCard = ({ icon: Icon, title, description }: { icon: typeof Sparkles
 
 export function LandingPage({ view, setView }: LandingPageProps) {
   console.log('LandingPage rendered');
-const renderForm = () => {
+  const renderForm = () => {
     return <div className="bg-white rounded-xl p-5 text-slate-900">Static auth form - click buttons to test</div>;
   };
 
@@ -157,10 +157,10 @@ const renderForm = () => {
               { icon: Clock3, title: 'Move from idea to prototype in one sitting', desc: 'Chat your specs, get live previews, fix errors automatically, and iterate without context switching.' },
               { icon: FileCode, title: 'Multi-language, multi-framework', desc: 'Target Mojo, Python, or JavaScript stacks; ship FastAPI backends, React frontends, and more.' },
               { icon: Wand2, title: 'Claude + Grok side-by-side', desc: 'Choose the AI that fits the task; compare, retry, and blend outputs for the best result.' },
-            ].map(({ icon, title, desc }) => (
+            ].map(({ icon: Icon, title, desc }) => (
               <div key={title} className="card-elevated bg-white/5 border border-white/10 rounded-2xl p-6 hover:border-white/30 transition-all duration-300">
                 <div className="w-11 h-11 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center mb-4">
-                  {icon({ className: 'w-5 h-5 text-white' })}
+                  <Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{title}</h3>
                 <p className="text-white/70 leading-relaxed">{desc}</p>
