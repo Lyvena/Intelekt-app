@@ -38,7 +38,7 @@ export function LandingPage({ view, setView }: LandingPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden">
+    <div className="min-h-screen bg-slate-950 text-white relative overflow-hidden dark">
       {/* Simplified background */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-slate-900 to-slate-950 opacity-50" />
 
@@ -163,7 +163,7 @@ export function LandingPage({ view, setView }: LandingPageProps) {
                   <Icon className="w-5 h-5 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">{title}</h3>
-                <p className="text-white/70 leading-relaxed">{desc}</p>
+                <p className="text-white/70 leading-relaxed">{desc} 33333</p>
               </div>
             ))}
           </div>
